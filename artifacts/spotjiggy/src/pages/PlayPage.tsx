@@ -1,8 +1,14 @@
 import { useParams } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Layout } from "@/components/Layout";
-import { useGetPuzzle, useListPuzzlePieces, useCollectPiece, getListPuzzlePiecesQueryKey, getGetPuzzleQueryKey } from "@workspace/api-client-react";
+import {
+  useGetPuzzle,
+  useListPuzzlePieces,
+  useCollectPiece,
+  getListPuzzlePiecesQueryKey,
+  getGetPuzzleQueryKey,
+} from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -12,8 +18,11 @@ export default function PlayPage() {
   const { isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [selectedPiece, setSelectedPiece] = useState<any>(null);
-  const [justCollected, setJustCollected] = useState<string | null>(null);
+
+  const [draggingPieceId, setDraggingPieceId] = useState<string | null>(null);
+  const [dragOverCell, setDragOverCell] = useState<number | null>(null);
+  const [justPlaced, setJustPlaced] = useState<Set<string>>(new Set());
+  const [shakingPieceId, setShakingPieceId] = useState<string | null>(null);
 
   const { data: puzzle, isLoading: puzzleLoading } = useGetPuzzle(id);
   const { data: pieces, isLoading: piecesLoading } = useListPuzzlePieces(id, {
@@ -23,19 +32,23 @@ export default function PlayPage() {
   const collectMutation = useCollectPiece({
     mutation: {
       onSuccess: (data) => {
-        setJustCollected(data.piece.id);
-        setTimeout(() => setJustCollected(null), 1500);
+        setJustPlaced((prev) => new Set([...prev, data.piece.id]));
+        setTimeout(() => {
+          setJustPlaced((prev) => {
+            const next = new Set(prev);
+            next.delete(data.piece.id);
+            return next;
+          });
+        }, 800);
         queryClient.invalidateQueries({ queryKey: getListPuzzlePiecesQueryKey(id) });
         queryClient.invalidateQueries({ queryKey: getGetPuzzleQueryKey(id) });
-
         if (data.puzzleCompleted) {
-          toast({ title: "You completed the puzzle! Congratulations!" });
+          toast({ title: "Puzzle complete! Congratulations!" });
         } else if (data.badgeAwarded) {
           toast({ title: `Badge earned: ${data.badgeAwarded.name}` });
         } else {
-          toast({ title: "Piece collected!" });
+          toast({ title: "Piece placed!" });
         }
-        setSelectedPiece(null);
       },
       onError: (e: any) => {
         toast({ title: e?.data?.error ?? "Could not collect piece", variant: "destructive" });
@@ -46,11 +59,13 @@ export default function PlayPage() {
   if (puzzleLoading || piecesLoading) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto">
-          <div className="h-64 bg-card rounded-2xl border border-card-border animate-pulse mb-6" />
-          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-3">
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div key={i} className="aspect-square bg-card rounded-xl border border-card-border animate-pulse" />
+        <div className="max-w-5xl mx-auto">
+          <div className="h-8 w-64 bg-card rounded-xl border border-card-border animate-pulse mb-2" />
+          <div className="h-4 w-32 bg-muted rounded-lg animate-pulse mb-6" />
+          <div className="aspect-video bg-card rounded-2xl border border-card-border animate-pulse mb-6" />
+          <div className="grid grid-cols-8 gap-2">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="aspect-square bg-card rounded-xl animate-pulse" />
             ))}
           </div>
         </div>
@@ -69,208 +84,367 @@ export default function PlayPage() {
   }
 
   const allPieces = pieces ?? puzzle.pieces ?? [];
-  const collectedCount = allPieces.filter(p => p.collected?.length > 0).length;
-  const progress = allPieces.length > 0 ? (collectedCount / allPieces.length) * 100 : 0;
+  const cols =
+    puzzle.cut.type === "column"
+      ? puzzle.cut.count
+      : Math.round(Math.sqrt(puzzle.cut.count));
+  const rows =
+    puzzle.cut.type === "column" ? 1 : Math.ceil(puzzle.cut.count / cols);
 
-  const cols = puzzle.cut.type === "column" ? puzzle.cut.count : Math.round(Math.sqrt(puzzle.cut.count));
-  const rows = puzzle.cut.type === "column" ? 1 : Math.ceil(puzzle.cut.count / cols);
+  const pieceByPosition = new Map<number, any>(
+    allPieces.map((p: any) => [p.position, p])
+  );
 
-  const handlePieceClick = (piece: any) => {
-    if (!isLoggedIn) {
-      toast({ title: "Sign in to collect pieces", variant: "destructive" });
+  const isCollected = (piece: any) => (piece.collected?.length ?? 0) > 0;
+  const collectedCount = allPieces.filter(isCollected).length;
+  const progress =
+    allPieces.length > 0 ? (collectedCount / allPieces.length) * 100 : 0;
+
+  const trayPieces = allPieces.filter((p: any) => !isCollected(p));
+
+  const bgSize = `${cols * 100}% ${rows * 100}%`;
+  const bgPos = (col: number, row: number) => {
+    const x = cols > 1 ? (col / (cols - 1)) * 100 : 0;
+    const y = rows > 1 ? (row / (rows - 1)) * 100 : 0;
+    return `${x}% ${y}%`;
+  };
+
+  const handleDrop = (cellIndex: number) => {
+    setDragOverCell(null);
+    if (!draggingPieceId || !isLoggedIn) return;
+
+    const piece = allPieces.find((p: any) => p.id === draggingPieceId);
+    if (!piece) return;
+
+    if (piece.position !== cellIndex) {
+      setShakingPieceId(draggingPieceId);
+      setTimeout(() => setShakingPieceId(null), 500);
+      toast({ title: "Wrong spot! Try the correct cell.", variant: "destructive" });
+      setDraggingPieceId(null);
       return;
     }
-    setSelectedPiece(piece);
+
+    collectMutation.mutate({ id: draggingPieceId });
+    setDraggingPieceId(null);
   };
 
   const handleShare = (piece: any) => {
-    const url = window.location.origin + `/play/${id}?piece=${piece.id}`;
-    navigator.clipboard.writeText(url).then(() => {
-      toast({ title: "Piece link copied to clipboard!" });
-    });
+    const url = `${window.location.origin}/play/${id}?piece=${piece.id}`;
+    navigator.clipboard.writeText(url).then(() =>
+      toast({ title: "Piece link copied!" })
+    );
   };
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-5">
           <div className="flex items-start justify-between mb-2">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">{puzzle.message || "Untitled Puzzle"}</h1>
+              <h1 className="text-2xl font-bold text-foreground">
+                {puzzle.message || "Untitled Puzzle"}
+              </h1>
               <div className="flex items-center gap-2 mt-1">
                 <img
                   src={puzzle.createdBy.avatar}
                   alt={puzzle.createdBy.name}
                   className="w-5 h-5 rounded-full"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/fun-emoji/svg?seed=default"; }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://api.dicebear.com/7.x/fun-emoji/svg?seed=default";
+                  }}
                 />
-                <span className="text-sm text-muted-foreground">by {puzzle.createdBy.name}</span>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                  puzzle.type === "group" ? "bg-secondary/20 text-secondary" : "bg-accent/30 text-foreground"
-                }`}>
+                <span className="text-sm text-muted-foreground">
+                  by {puzzle.createdBy.name}
+                </span>
+                <span
+                  className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                    puzzle.type === "group"
+                      ? "bg-secondary/20 text-secondary"
+                      : "bg-accent/30 text-foreground"
+                  }`}
+                >
                   {puzzle.type}
                 </span>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-2xl font-bold text-foreground">{collectedCount}</span>
-              <span className="text-muted-foreground text-sm">/{allPieces.length} pieces</span>
+            <div className="text-right shrink-0 ml-4">
+              <span className="text-3xl font-bold text-foreground tabular-nums">
+                {collectedCount}
+              </span>
+              <span className="text-muted-foreground text-sm">
+                /{allPieces.length}
+              </span>
+              <p className="text-xs text-muted-foreground">pieces placed</p>
             </div>
           </div>
 
-          <div className="bg-muted rounded-full h-3 overflow-hidden">
+          <div className="bg-muted rounded-full h-2.5 overflow-hidden">
             <motion.div
               className="h-full bg-gradient-to-r from-primary to-secondary rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
             />
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{Math.round(progress)}% complete</p>
         </div>
 
-        <div className="bg-card border border-card-border rounded-2xl p-4 mb-6">
-          <div
-            className="relative mx-auto overflow-hidden rounded-xl"
-            style={{ maxHeight: "300px", aspectRatio: `${cols}/${rows}` }}
-          >
-            <img
-              src={puzzle.image}
-              alt={puzzle.message}
-              className="w-full h-full object-cover"
-              onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${id}/800/600`; }}
-            />
-            <div className="absolute inset-0" style={{
-              backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent calc(${100/rows}% - 1px), rgba(255,255,255,0.5) calc(${100/rows}% - 1px), rgba(255,255,255,0.5) ${100/rows}%), repeating-linear-gradient(90deg, transparent, transparent calc(${100/cols}% - 1px), rgba(255,255,255,0.5) calc(${100/cols}% - 1px), rgba(255,255,255,0.5) ${100/cols}%)`,
-            }} />
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <h2 className="font-semibold text-foreground mb-3">Pieces</h2>
-          <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${Math.min(cols * 2, 8)}, 1fr)` }}
-          >
-            {allPieces.map((piece, i) => {
-              const isCollected = piece.collected?.length > 0;
-              const isJust = justCollected === piece.id;
-
-              return (
-                <motion.button
-                  key={piece.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.02 }}
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.92 }}
-                  onClick={() => handlePieceClick(piece)}
-                  className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
-                    isCollected
-                      ? "border-primary/50 shadow-sm"
-                      : "border-dashed border-muted-foreground/30 opacity-50 hover:opacity-75"
-                  }`}
-                >
-                  <img
-                    src={piece.image}
-                    alt={`Piece ${piece.position + 1}`}
-                    className={`w-full h-full object-cover transition-all ${isCollected ? "grayscale-0" : "grayscale"}`}
-                    style={{
-                      objectPosition: `${(piece.position % cols) * (100 / Math.max(cols - 1, 1))}% ${Math.floor(piece.position / cols) * (100 / Math.max(rows - 1, 1))}%`,
-                    }}
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${piece.id}/100/100`; }}
-                  />
-                  <AnimatePresence>
-                    {isJust && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 flex items-center justify-center bg-primary/80"
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </motion.div>
-                    )}
-                    {isCollected && !isJust && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="absolute top-1 right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center"
-                      >
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  <span className="absolute bottom-0.5 left-0 right-0 text-center text-[9px] text-white/80 font-medium bg-black/20">
-                    #{piece.position + 1}
-                  </span>
-                </motion.button>
-              );
-            })}
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {selectedPiece && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4"
-              onClick={() => setSelectedPiece(null)}
+        <div className="grid lg:grid-cols-[1fr_220px] gap-5">
+          {/* ── PUZZLE BOARD ── */}
+          <div className="bg-card border border-card-border rounded-2xl p-3 shadow-sm">
+            <p className="text-xs text-muted-foreground mb-2 text-center">
+              {trayPieces.length > 0
+                ? "Drag a piece from the tray and drop it on the matching cell"
+                : "All pieces placed!"}
+            </p>
+            <div
+              className="relative rounded-xl overflow-hidden select-none"
+              style={{ aspectRatio: `${cols}/${rows}` }}
             >
-              <motion.div
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 50, opacity: 0 }}
-                onClick={e => e.stopPropagation()}
-                className="bg-card border border-card-border rounded-2xl p-6 w-full max-w-sm"
+              {/* Greyscale base image */}
+              <img
+                src={puzzle.image}
+                alt={puzzle.message}
+                className="absolute inset-0 w-full h-full object-cover grayscale"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${id}/800/600`;
+                }}
+              />
+
+              {/* Grid of cells */}
+              <div
+                className="absolute inset-0 grid"
+                style={{
+                  gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                  gridTemplateRows: `repeat(${rows}, 1fr)`,
+                }}
               >
-                <div className="aspect-square rounded-xl overflow-hidden mb-4">
-                  <img
-                    src={selectedPiece.image}
-                    alt="Puzzle piece"
-                    className={`w-full h-full object-cover ${selectedPiece.collected?.length > 0 ? "" : "grayscale"}`}
-                    onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${selectedPiece.id}/300/300`; }}
-                  />
-                </div>
-                <h3 className="font-bold text-foreground mb-1">Piece #{selectedPiece.position + 1}</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {selectedPiece.collected?.length > 0
-                    ? `Collected by ${selectedPiece.collected.length} player(s)`
-                    : "Not yet collected"}
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleShare(selectedPiece)}
-                    className="py-2.5 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
-                  >
-                    Share Link
-                  </motion.button>
-                  {selectedPiece.collected?.length === 0 || puzzle.type === "solo" ? (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => collectMutation.mutate({ id: selectedPiece.id })}
-                      disabled={collectMutation.isPending}
-                      className="py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                {Array.from({ length: cols * rows }).map((_, cellIdx) => {
+                  const col = cellIdx % cols;
+                  const row = Math.floor(cellIdx / cols);
+                  const piece = pieceByPosition.get(cellIdx);
+                  const collected = piece && isCollected(piece);
+                  const isOver = dragOverCell === cellIdx;
+                  const isJust = piece && justPlaced.has(piece.id);
+                  const canAccept =
+                    draggingPieceId &&
+                    allPieces.find((p: any) => p.id === draggingPieceId)
+                      ?.position === cellIdx;
+
+                  return (
+                    <div
+                      key={cellIdx}
+                      className="relative border border-white/15"
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverCell(cellIdx);
+                      }}
+                      onDragLeave={(e) => {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node))
+                          setDragOverCell(null);
+                      }}
+                      onDrop={() => handleDrop(cellIdx)}
                     >
-                      {collectMutation.isPending ? "Collecting..." : "Collect Piece"}
-                    </motion.button>
-                  ) : (
-                    <div className="py-2.5 bg-muted text-muted-foreground rounded-xl text-sm font-medium text-center">
-                      Already claimed
+                      {/* Colored image layer for collected pieces */}
+                      <AnimatePresence>
+                        {collected && (
+                          <motion.div
+                            key={`collected-${cellIdx}`}
+                            initial={isJust ? { opacity: 0, scale: 1.12 } : { opacity: 1 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4, ease: "easeOut" }}
+                            className="absolute inset-0"
+                            style={{
+                              backgroundImage: `url(${puzzle.image})`,
+                              backgroundSize: bgSize,
+                              backgroundPosition: bgPos(col, row),
+                              backgroundRepeat: "no-repeat",
+                            }}
+                          />
+                        )}
+                      </AnimatePresence>
+
+                      {/* Drop highlight */}
+                      {isOver && !collected && (
+                        <div
+                          className={`absolute inset-0 border-2 transition-colors ${
+                            canAccept
+                              ? "border-primary bg-primary/25"
+                              : "border-destructive/60 bg-destructive/10"
+                          }`}
+                        />
+                      )}
+
+                      {/* "Just placed" flash */}
+                      <AnimatePresence>
+                        {isJust && (
+                          <motion.div
+                            key={`flash-${cellIdx}`}
+                            initial={{ opacity: 0.7 }}
+                            animate={{ opacity: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.7 }}
+                            className="absolute inset-0 bg-white pointer-events-none"
+                          />
+                        )}
+                      </AnimatePresence>
                     </div>
-                  )}
+                  );
+                })}
+              </div>
+
+              {/* Subtle vignette */}
+              {progress === 100 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="absolute inset-0 ring-4 ring-primary/50 ring-inset rounded-xl pointer-events-none"
+                />
+              )}
+            </div>
+          </div>
+
+          {/* ── PIECE TRAY ── */}
+          <div className="bg-card border border-card-border rounded-2xl p-3 flex flex-col">
+            <h2 className="font-semibold text-foreground text-sm mb-1">
+              Your Pieces
+            </h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              {trayPieces.length === 0
+                ? "No pieces left to place"
+                : `${trayPieces.length} remaining — drag to board`}
+            </p>
+
+            {trayPieces.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-4">
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mb-2">
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#22c55e"
+                    strokeWidth="2.5"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
                 </div>
-              </motion.div>
+                <p className="text-sm font-semibold text-foreground">All placed!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 lg:grid-cols-2 gap-2 overflow-y-auto">
+                {trayPieces.map((piece: any) => {
+                  const col = piece.position % cols;
+                  const row = Math.floor(piece.position / cols);
+                  const isShaking = shakingPieceId === piece.id;
+                  const isDragging = draggingPieceId === piece.id;
+
+                  return (
+                    <motion.div
+                      key={piece.id}
+                      animate={
+                        isShaking
+                          ? { x: [0, -6, 6, -4, 4, 0] }
+                          : { x: 0 }
+                      }
+                      transition={{ duration: 0.4 }}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggingPieceId(piece.id);
+                        const el = e.currentTarget as HTMLElement;
+                        const ghost = el.cloneNode(true) as HTMLElement;
+                        ghost.style.position = "fixed";
+                        ghost.style.top = "-9999px";
+                        document.body.appendChild(ghost);
+                        (e as any).dataTransfer.setDragImage(ghost, el.offsetWidth / 2, el.offsetHeight / 2);
+                        setTimeout(() => ghost.remove(), 0);
+                      }}
+                      onDragEnd={() => {
+                        setDraggingPieceId(null);
+                        setDragOverCell(null);
+                      }}
+                      className={`relative aspect-square rounded-lg overflow-hidden border-2 cursor-grab active:cursor-grabbing transition-all select-none ${
+                        isDragging
+                          ? "border-primary opacity-50 scale-95"
+                          : "border-border hover:border-primary/60 hover:shadow-md"
+                      }`}
+                      title={`Piece #${piece.position + 1} — drag to its matching cell`}
+                    >
+                      <div
+                        className="absolute inset-0 grayscale hover:grayscale-0 transition-all duration-300"
+                        style={{
+                          backgroundImage: `url(${puzzle.image})`,
+                          backgroundSize: bgSize,
+                          backgroundPosition: bgPos(col, row),
+                          backgroundRepeat: "no-repeat",
+                        }}
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 text-center text-[9px] text-white/80 bg-black/30 leading-4">
+                        #{piece.position + 1}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Collected pieces summary */}
+            {collectedCount > 0 && (
+              <div className="mt-3 pt-3 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-2 font-medium">
+                  Placed ({collectedCount})
+                </p>
+                <div className="grid grid-cols-4 lg:grid-cols-3 gap-1">
+                  {allPieces
+                    .filter(isCollected)
+                    .map((piece: any) => {
+                      const col = piece.position % cols;
+                      const row = Math.floor(piece.position / cols);
+                      return (
+                        <div
+                          key={piece.id}
+                          className="relative aspect-square rounded-md overflow-hidden border border-primary/30 cursor-pointer group"
+                          title={`Share piece #${piece.position + 1}`}
+                          onClick={() => handleShare(piece)}
+                        >
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              backgroundImage: `url(${puzzle.image})`,
+                              backgroundSize: bgSize,
+                              backgroundPosition: bgPos(col, row),
+                              backgroundRepeat: "no-repeat",
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                              <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13" />
+                            </svg>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Hint bar when dragging */}
+        <AnimatePresence>
+          {draggingPieceId && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-sm font-medium px-5 py-2.5 rounded-full shadow-xl z-50 flex items-center gap-2"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 11V6a2 2 0 00-2-2v0a2 2 0 00-2 2v0M14 10V4a2 2 0 00-2-2v0a2 2 0 00-2 2v0M10 10.5V6a2 2 0 00-2-2v0a2 2 0 00-2 2v6" />
+                <path d="M18 11a2 2 0 114 0v3a8 8 0 01-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 012.83-2.82L7 15" />
+              </svg>
+              Drop on the glowing cell to place this piece
             </motion.div>
           )}
         </AnimatePresence>
