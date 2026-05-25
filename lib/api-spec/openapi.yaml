@@ -3,13 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SpotJiggy API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: puzzles
+    description: Puzzle operations
+  - name: pieces
+    description: Piece operations
+  - name: users
+    description: User operations
+  - name: store
+    description: Store and packages
 paths:
   /healthz:
     get:
@@ -24,6 +34,442 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "400":
+          description: Validation error
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+
+  # ── Puzzles ───────────────────────────────────────────────────────────────
+  /puzzles:
+    get:
+      operationId: listPuzzles
+      tags: [puzzles]
+      summary: List active/open puzzles (home feed)
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [solo, group]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, open, closed]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Puzzle"
+    post:
+      operationId: createPuzzle
+      tags: [puzzles]
+      summary: Create a new puzzle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PuzzleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Puzzle"
+
+  /puzzles/trending:
+    get:
+      operationId: listTrendingPuzzles
+      tags: [puzzles]
+      summary: Get trending puzzles (most completions recently)
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 8
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Puzzle"
+
+  /puzzles/{id}:
+    get:
+      operationId: getPuzzle
+      tags: [puzzles]
+      summary: Get puzzle by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PuzzleDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updatePuzzle
+      tags: [puzzles]
+      summary: Update puzzle (creator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PuzzleUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Puzzle"
+    delete:
+      operationId: deletePuzzle
+      tags: [puzzles]
+      summary: Delete puzzle (creator only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /puzzles/{id}/publish:
+    post:
+      operationId: publishPuzzle
+      tags: [puzzles]
+      summary: Publish puzzle (change status to open)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Puzzle"
+
+  /puzzles/{id}/close:
+    post:
+      operationId: closePuzzle
+      tags: [puzzles]
+      summary: Close puzzle manually
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Puzzle"
+
+  /puzzles/{id}/pieces:
+    get:
+      operationId: listPuzzlePieces
+      tags: [pieces]
+      summary: Get all pieces of a puzzle
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Piece"
+
+  # ── Pieces ────────────────────────────────────────────────────────────────
+  /pieces/{id}:
+    get:
+      operationId: getPiece
+      tags: [pieces]
+      summary: Get a single piece by its shareable ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Piece"
+        "404":
+          description: Not found
+
+  /pieces/{id}/collect:
+    post:
+      operationId: collectPiece
+      tags: [pieces]
+      summary: Collect a puzzle piece
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectResult"
+        "409":
+          description: Already collected or limit reached
+
+  # ── Users ─────────────────────────────────────────────────────────────────
+  /users/{uid}:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Get user public profile
+      parameters:
+        - in: path
+          name: uid
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "404":
+          description: Not found
+
+  /users/{uid}/activity:
+    get:
+      operationId: listUserActivityFeed
+      tags: [users]
+      summary: Get user activity feed (last 20 entries)
+      parameters:
+        - in: path
+          name: uid
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEntry"
+
+  /users/me/stats:
+    get:
+      operationId: getMyStats
+      tags: [users]
+      summary: Get current user stats summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  /users/me/pieces:
+    get:
+      operationId: getMyPieces
+      tags: [users]
+      summary: Get pieces collected by current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Piece"
+
+  /users/me/badges:
+    get:
+      operationId: getMyBadges
+      tags: [users]
+      summary: Get badges earned by current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Badge"
+
+  /users/me/puzzles:
+    get:
+      operationId: getMyPuzzles
+      tags: [users]
+      summary: Get puzzles created by current user
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyPuzzlesResult"
+
+  # ── Store ─────────────────────────────────────────────────────────────────
+  /store/packages:
+    get:
+      operationId: listPackages
+      tags: [store]
+      summary: List available puzzle creator packages
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Package"
+
+  /store/checkout:
+    post:
+      operationId: createCheckout
+      tags: [store]
+      summary: Purchase a package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutResult"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +480,345 @@ components:
       required:
         - status
 
+    # ── Auth schemas ────────────────────────────────────────────────────────
+    RegisterInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthResult:
+      type: object
+      required: [user, token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+
+    # ── User schemas ────────────────────────────────────────────────────────
+    User:
+      type: object
+      required: [sub, name, avatar, type, created]
+      properties:
+        sub:
+          type: string
+        name:
+          type: string
+        avatar:
+          type: string
+        type:
+          type: string
+          enum: [site, google]
+        created:
+          type: integer
+        remainingPuzzles:
+          type: ["integer", "null"]
+        piecesCount:
+          type: integer
+        badgesCount:
+          type: integer
+
+    UserProfile:
+      type: object
+      required: [sub, name, avatar, created]
+      properties:
+        sub:
+          type: string
+        name:
+          type: string
+        avatar:
+          type: string
+        created:
+          type: integer
+        piecesCount:
+          type: integer
+        badgesCount:
+          type: integer
+        activePuzzlesCount:
+          type: integer
+        closedPuzzlesCount:
+          type: integer
+        badges:
+          type: array
+          items:
+            $ref: "#/components/schemas/Badge"
+
+    UserStats:
+      type: object
+      required: [piecesCollected, badgesEarned, puzzlesCreated, puzzlesCompleted]
+      properties:
+        piecesCollected:
+          type: integer
+        badgesEarned:
+          type: integer
+        puzzlesCreated:
+          type: integer
+        puzzlesCompleted:
+          type: integer
+        remainingPuzzles:
+          type: ["integer", "null"]
+
+    ActivityEntry:
+      type: object
+      required: [type, on, details]
+      properties:
+        type:
+          type: string
+        on:
+          type: integer
+        details:
+          type: string
+
+    MyPuzzlesResult:
+      type: object
+      required: [active, closed]
+      properties:
+        active:
+          type: array
+          items:
+            $ref: "#/components/schemas/Puzzle"
+        closed:
+          type: array
+          items:
+            $ref: "#/components/schemas/Puzzle"
+
+    # ── Puzzle schemas ──────────────────────────────────────────────────────
+    PuzzleCreator:
+      type: object
+      required: [sub, name, avatar]
+      properties:
+        sub:
+          type: string
+        name:
+          type: string
+        avatar:
+          type: string
+
+    PuzzleCut:
+      type: object
+      required: [type, count]
+      properties:
+        type:
+          type: string
+          enum: [column, rect, broken]
+        count:
+          type: integer
+
+    Puzzle:
+      type: object
+      required: [id, image, message, type, status, pieces, createdBy, createdOn, cut, completionCount]
+      properties:
+        id:
+          type: string
+        image:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [solo, group]
+        status:
+          type: string
+          enum: [pending, open, closed]
+        closeType:
+          type: ["string", "null"]
+          enum: [completed, cancelled, timeout, "null"]
+        completionBadge:
+          oneOf:
+            - $ref: "#/components/schemas/Badge"
+            - type: "null"
+        participationBadge:
+          oneOf:
+            - $ref: "#/components/schemas/Badge"
+            - type: "null"
+        pieces:
+          type: array
+          items:
+            $ref: "#/components/schemas/Piece"
+        createdBy:
+          $ref: "#/components/schemas/PuzzleCreator"
+        createdOn:
+          type: integer
+        timeLimit:
+          type: ["integer", "null"]
+        closedOn:
+          type: ["integer", "null"]
+        completionCount:
+          type: integer
+        cut:
+          $ref: "#/components/schemas/PuzzleCut"
+
+    PuzzleDetail:
+      allOf:
+        - $ref: "#/components/schemas/Puzzle"
+        - type: object
+          properties:
+            completers:
+              type: array
+              items:
+                $ref: "#/components/schemas/PuzzleCreator"
+            participants:
+              type: array
+              items:
+                $ref: "#/components/schemas/PuzzleCreator"
+
+    PuzzleInput:
+      type: object
+      required: [image, message, type, cut]
+      properties:
+        image:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [solo, group]
+        cut:
+          $ref: "#/components/schemas/PuzzleCut"
+        timeLimit:
+          type: ["integer", "null"]
+        completionBadge:
+          oneOf:
+            - $ref: "#/components/schemas/BadgeInput"
+            - type: "null"
+        participationBadge:
+          oneOf:
+            - $ref: "#/components/schemas/BadgeInput"
+            - type: "null"
+
+    PuzzleUpdate:
+      type: object
+      properties:
+        message:
+          type: string
+        timeLimit:
+          type: ["integer", "null"]
+
+    # ── Piece schemas ───────────────────────────────────────────────────────
+    CollectedBy:
+      type: object
+      required: [by, on]
+      properties:
+        by:
+          $ref: "#/components/schemas/PuzzleCreator"
+        on:
+          type: integer
+
+    Piece:
+      type: object
+      required: [id, image, position, limit, collected]
+      properties:
+        id:
+          type: string
+        image:
+          type: string
+        position:
+          type: integer
+        limit:
+          type: integer
+        collected:
+          type: array
+          items:
+            $ref: "#/components/schemas/CollectedBy"
+        puzzleId:
+          type: string
+        shareUrl:
+          type: string
+
+    CollectResult:
+      type: object
+      required: [success, piece]
+      properties:
+        success:
+          type: boolean
+        piece:
+          $ref: "#/components/schemas/Piece"
+        badgeAwarded:
+          oneOf:
+            - $ref: "#/components/schemas/Badge"
+            - type: "null"
+        puzzleCompleted:
+          type: boolean
+
+    # ── Badge schemas ───────────────────────────────────────────────────────
+    Badge:
+      type: object
+      required: [id, name, image]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        image:
+          type: string
+        description:
+          type: ["string", "null"]
+
+    BadgeInput:
+      type: object
+      required: [name, image]
+      properties:
+        name:
+          type: string
+        image:
+          type: string
+        description:
+          type: ["string", "null"]
+
+    # ── Store schemas ───────────────────────────────────────────────────────
+    Package:
+      type: object
+      required: [id, puzzleCount, price]
+      properties:
+        id:
+          type: string
+        puzzleCount:
+          type: integer
+        price:
+          type: number
+        originalPrice:
+          type: ["number", "null"]
+        discountName:
+          type: ["string", "null"]
+        popular:
+          type: boolean
+
+    CheckoutInput:
+      type: object
+      required: [packageId]
+      properties:
+        packageId:
+          type: string
+        couponCode:
+          type: ["string", "null"]
+
+    CheckoutResult:
+      type: object
+      required: [success, txid, puzzlesAdded]
+      properties:
+        success:
+          type: boolean
+        txid:
+          type: string
+        puzzlesAdded:
+          type: integer
+        remainingPuzzles:
+          type: integer

@@ -1,0 +1,169 @@
+# SpotJiggy
+An online platform that allows users to create a jigsaw puzzle and allow other users to collect pieces to complete the puzzle.
+
+# Workflow
+- users can upload an image and slice into a puzzle with a selected number of pieces.
+- a puzzle can be set to individual completion where each player completes their own copy of the puzzle image
+  or group completion where players collect pieces to complete the puzzle together.
+- a puzzle can have an associated completion badge and participation badge.
+- each puzzle piece will have a shareable url.
+- pieces of a group completion puzzle have an collection count of 1.
+- pieces of an individual completion puzzle have an unlimited collection count.
+
+# Models
+## User
+Any user of the platform. Baseline object for both puzzle makers and players.
+```
+{
+    sub: string,
+    name: string,
+    avatar: string,
+    type: 'site'|'google',
+    created: number,
+    closedPuzzles: Puzzle[],
+    activePuzzles: Puzzle[],
+    activity: [{
+        type: string,
+        on: number,
+        details: string
+    }]
+}
+```
+### Puzzle Maker Properties
+Part of *User* model
+```
+{
+    ...,
+    remainingPuzzles: number,
+    billing: Billing
+}
+```
+### Player Properties
+Part of *User* model
+```
+{
+    ...,
+    pieces: Piece[],
+    badges: Badge[]
+}
+```
+## Puzzle
+### Puzzle base
+```
+{
+    id: string,
+    image: string,
+    message: string,
+    type: 'solo'|'group'
+    status: 'pending'|'open'|'closed',
+    closeType: 'completed'|'cancelled'|'timeout'
+    completionBadge: Badge,
+    participationBadge: Badge,
+    pieces: Piece[],
+    createdBy: {
+        sub: string,
+        name: string,
+        avatar: string
+    },
+    createdOn: number,
+    timeLimit: number,
+    closedOn: number,
+    completionCount: number,
+    cut: {
+        type: 'column'|'rect'|'broken',
+        count: number
+    },
+}
+```
+### Puzzle detail
+More details available to the creator. Extends *Puzzle* model
+```
+{
+    ...,
+    completers: [{
+        sub: string,
+        name: string,
+        avatar: string
+    }],
+    participants: [{
+        sub: string,
+        name: string,
+        avatar: string
+    }]
+}
+```
+## Piece
+```
+{
+    id: string,
+    image: string,
+    position: number,
+    limit: number,
+    collected: [{
+        by: {
+            sub: string,
+            name: string,
+            avatar: string
+        },
+        on: number
+    }],
+    tried: [{
+        by: {
+            sub: string,
+            name: string,
+            avatar: string
+        },
+        on: number
+    }]
+}
+```
+## Package
+```
+{
+    id: string,
+    puzzleCount: number,
+    price: number,
+    costing: {
+        origPrice: number,
+        discount: {
+            name: string
+            m: number
+        },
+        coupon: {
+            code: number,
+            m: number
+        }
+    }
+}
+```
+## Billing
+```
+{
+    purchases: [{
+        package: Package,
+        on: number,
+        price: number,
+        txid: number,
+        status: 'success'|'fail'
+    }]
+}
+```
+
+# Structure
+- App
+  - Pages:
+    - Login '/login'
+    - Home '/','/home'
+      - Active Puzzles
+    - Editor '/edit/:id'
+    - Play '/play/:id'
+    - Profile '/profile/:uid'
+      - Activity Feed
+    - Store '/store'
+      - Packages
+    - Checkout '/store/checkout'
+  - Services:
+    - Auth - handles authentication (makes http requests without *Data* service)
+    - Data - handles http requests and data passing
+    - Puzzle - handles puzzle and piece logic
+    - Store - handles packages, discounts/specials and payment logic
