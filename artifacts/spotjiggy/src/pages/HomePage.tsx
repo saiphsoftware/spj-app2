@@ -1,13 +1,15 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useListPuzzles, useListTrendingPuzzles, useGetMe } from "@workspace/api-client-react";
+import { useListPuzzles, useListTrendingPuzzles, useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { PuzzleCard } from "@/components/PuzzleCard";
+import { useBucket } from "@/context/BucketContext";
 
 export default function HomePage() {
   const { isLoggedIn } = useAuth();
-  const { data: me } = useGetMe({ query: { enabled: isLoggedIn } });
+  const { pieces: bucketPieces } = useBucket();
+  const { data: me } = useGetMe({ query: { enabled: isLoggedIn, queryKey: getGetMeQueryKey() } });
   const { data: puzzles, isLoading } = useListPuzzles({ status: "open" });
   const { data: trending } = useListTrendingPuzzles({ limit: 8 });
 
@@ -65,6 +67,52 @@ export default function HomePage() {
             </motion.button>
           </Link>
         </motion.div>
+      )}
+
+      {(isLoggedIn || bucketPieces.length > 0) && (
+        <motion.section
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-10 rounded-3xl border border-primary/20 bg-primary/[0.04] p-5 sm:p-6"
+        >
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary mb-1">Just for you</p>
+              <h2 className="text-xl font-bold text-foreground">Pieces in your Bucket</h2>
+            </div>
+            <Link href="/bucket" className="text-sm font-semibold text-primary hover:underline">
+              Open Bucket
+            </Link>
+          </div>
+          {bucketPieces.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {bucketPieces.slice(0, 4).map((piece) => (
+                <Link key={piece.id} href="/bucket">
+                  <motion.div
+                    whileHover={{ y: -3 }}
+                    className="overflow-hidden rounded-2xl bg-card border border-card-border shadow-sm"
+                  >
+                    <div className="relative aspect-square bg-muted">
+                      <img
+                        src={piece.pieceImage || piece.puzzleImage}
+                        alt={`Piece #${piece.position + 1}`}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <span className="absolute top-2 left-2 rounded-full bg-foreground/80 text-background px-2 py-0.5 text-[10px] font-bold">
+                        #{piece.position + 1}
+                      </span>
+                    </div>
+                    <p className="truncate px-3 py-2 text-xs font-semibold text-foreground">{piece.puzzleTitle}</p>
+                  </motion.div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-primary/20 bg-card/60 px-4 py-5 text-sm text-muted-foreground">
+              Shared pieces will land here before you add them to a puzzle.
+            </p>
+          )}
+        </motion.section>
       )}
 
       {trending && trending.length > 0 && (

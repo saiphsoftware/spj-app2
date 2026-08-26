@@ -3,8 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/context/AuthContext";
+import { BucketProvider } from "@/context/BucketContext";
 import LoginPage from "@/pages/LoginPage";
 import HomePage from "@/pages/HomePage";
+import BucketPage from "@/pages/BucketPage";
 import EditorPage from "@/pages/EditorPage";
 import PlayPage from "@/pages/PlayPage";
 import ProfilePage from "@/pages/ProfilePage";
@@ -27,6 +29,7 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/home" component={HomePage} />
       <Route path="/" component={HomePage} />
+      <Route path="/bucket" component={BucketPage} />
       <Route path="/edit/:id" component={EditorPage} />
       <Route path="/play/:id" component={PlayPage} />
       <Route path="/profile/:uid" component={ProfilePage} />
@@ -41,12 +44,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
+        <BucketProvider>
+          <TooltipProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            <Toaster />
+          </TooltipProvider>
+        </BucketProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

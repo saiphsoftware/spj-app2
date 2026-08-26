@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useGetUserProfile, useListUserActivityFeed, useGetMyStats } from "@workspace/api-client-react";
+import { useGetUserProfile, useListUserActivityFeed, useGetMyStats, getGetMyStatsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 
 function timeAgo(ts: number): string {
@@ -26,7 +26,7 @@ export default function ProfilePage() {
 
   const { data: profile, isLoading } = useGetUserProfile(uid);
   const { data: activity } = useListUserActivityFeed(uid);
-  const { data: myStats } = useGetMyStats({ query: { enabled: isLoggedIn } });
+  const { data: myStats } = useGetMyStats({ query: { enabled: isLoggedIn, queryKey: getGetMyStatsQueryKey() } });
 
   if (isLoading) {
     return (

@@ -1,8 +1,9 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetMe } from "@workspace/api-client-react";
+import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
+import { useBucket } from "@/context/BucketContext";
 
 interface LayoutProps {
   children: ReactNode;
@@ -11,7 +12,8 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
   const { isLoggedIn, setToken } = useAuth();
-  const { data: me } = useGetMe({ query: { enabled: isLoggedIn } });
+  const { pieces: bucketPieces } = useBucket();
+  const { data: me } = useGetMe({ query: { enabled: isLoggedIn, queryKey: getGetMeQueryKey() } });
 
   const handleLogout = () => {
     setToken(null);
@@ -40,6 +42,26 @@ export function Layout({ children }: LayoutProps) {
           </Link>
 
           <div className="flex items-center gap-1">
+            <Link href="/bucket">
+              <motion.div
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`relative flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors rounded-lg hover:bg-muted ${
+                  location === "/bucket" ? "text-primary" : "text-foreground"
+                }`}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 8h14l-1 12H6L5 8Z" />
+                  <path d="M9 8V6a3 3 0 0 1 6 0v2M8 12h8" />
+                </svg>
+                <span>Bucket</span>
+                {bucketPieces.length > 0 && (
+                  <span className="min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                    {bucketPieces.length}
+                  </span>
+                )}
+              </motion.div>
+            </Link>
             {isLoggedIn ? (
               <>
                 <Link href="/store">

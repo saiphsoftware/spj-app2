@@ -1,6 +1,6 @@
 import { useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/Layout";
 import {
   useGetPuzzle,
@@ -10,25 +10,10 @@ import {
   getGetPuzzleQueryKey,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
+import { useBucket } from "@/context/BucketContext";
+import { addAcquiredPiece, loadAcquired, saveAcquired } from "@/lib/pieceStorage";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-
-// ─── localStorage helpers for acquired pieces ────────────────────────────────
-function getAcquiredKey(puzzleId: string) {
-  // Versioned after a data reset so stale browser progress cannot reappear.
-  return `spotjiggy:acquired:v2:${puzzleId}`;
-}
-function loadAcquired(puzzleId: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(getAcquiredKey(puzzleId));
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-function saveAcquired(puzzleId: string, ids: Set<string>) {
-  localStorage.setItem(getAcquiredKey(puzzleId), JSON.stringify([...ids]));
-}
 
 // ─── Piece state legend ───────────────────────────────────────────────────────
 // State 1 – "acquired + available"  : user has the piece, not yet placed → COLOR, draggable
@@ -41,6 +26,7 @@ export default function PlayPage() {
   const { id } = useParams<{ id: string }>();
   const [location] = useLocation();
   const { isLoggedIn } = useAuth();
+  const { addPiece: addToBucket } = useBucket();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -52,27 +38,64 @@ export default function PlayPage() {
   const [draggingPieceId, setDraggingPieceId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<number | null>(null);
   const [shakingPieceId, setShakingPieceId] = useState<string | null>(null);
+  const handledLinkRef = useRef<string | null>(null);
 
   const { data: puzzle, isLoading: puzzleLoading } = useGetPuzzle(id);
   const { data: pieces, isLoading: piecesLoading } = useListPuzzlePieces(id, {
-    query: { enabled: !!id },
+    query: { enabled: !!id, queryKey: getListPuzzlePiecesQueryKey(id) },
   });
 
-  // If URL contains ?piece=PIECEID, auto-acquire that piece (simulates visiting a share link)
+  // A share link delivers a piece to the Bucket. It never adds the piece directly
+  // to the puzzle hand, and it never makes a board-view piece clickable to acquire.
   useEffect(() => {
     const params = new URLSearchParams(location.split("?")[1] ?? "");
     const pieceId = params.get("piece");
-    if (pieceId && !acquired.has(pieceId)) {
-      setAcquired((prev) => {
-        const next = new Set(prev);
-        next.add(pieceId);
-        saveAcquired(id, next);
-        return next;
-      });
-      toast({ title: "You received a piece! Drag it onto the board." });
+    const fromBucket = params.get("from") === "bucket";
+    if (!pieceId || !pieces || !puzzle || handledLinkRef.current === `${fromBucket}:${pieceId}`) return;
+
+    const piece = pieces.find((item: any) => item.id === pieceId);
+    handledLinkRef.current = `${fromBucket}:${pieceId}`;
+    if (!piece) {
+      toast({ title: "That piece link is no longer valid.", variant: "destructive" });
+      return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    if (fromBucket) {
+      if (!acquired.has(pieceId)) {
+        addAcquiredPiece(id, pieceId);
+        setAcquired((prev) => new Set([...prev, pieceId]));
+        toast({
+          title: `Piece #${piece.position + 1} added to your puzzle`,
+          description: "Drag it from your hand onto the matching spot.",
+        });
+      }
+      return;
+    }
+
+    if ((piece.collected?.length ?? 0) > 0) {
+      toast({ title: "That piece has already been used." });
+      return;
+    }
+
+    if (acquired.has(pieceId)) {
+      toast({ title: "That piece is already in your puzzle hand." });
+      return;
+    }
+
+    addToBucket({
+      id: piece.id,
+      puzzleId: id,
+      puzzleTitle: puzzle.message || "Untitled Puzzle",
+      puzzleImage: puzzle.image,
+      pieceImage: piece.image || puzzle.image,
+      position: piece.position,
+      addedAt: Date.now(),
+    });
+    toast({
+      title: `Piece #${piece.position + 1} added to your Bucket`,
+      description: "Open Bucket to add it to this puzzle.",
+    });
+  }, [acquired, addToBucket, id, isLoggedIn, location, pieces, puzzle, toast]);
 
   const collectMutation = useCollectPiece({
     mutation: {
@@ -160,18 +183,6 @@ export default function PlayPage() {
     const x = cols > 1 ? (col / (cols - 1)) * 100 : 0;
     const y = rows > 1 ? (row / (rows - 1)) * 100 : 0;
     return `${x}% ${y}%`;
-  };
-
-  // Demo helper: click a "not-acquired" piece to acquire it (simulates visiting share link)
-  const handleAcquire = (piece: any) => {
-    if (!isLoggedIn) { toast({ title: "Sign in first", variant: "destructive" }); return; }
-    setAcquired((prev) => {
-      const next = new Set(prev);
-      next.add(piece.id);
-      saveAcquired(id, next);
-      return next;
-    });
-    toast({ title: `Piece #${piece.position + 1} added to your hand!` });
   };
 
   const handleDrop = (cellIdx: number) => {
@@ -404,9 +415,6 @@ export default function PlayPage() {
                       setTimeout(() => ghost.remove(), 0);
                     }}
                     onDragEnd={() => { setDraggingPieceId(null); setDragOverCell(null); }}
-                    onClick={() => {
-                      if (state === "not-acquired") handleAcquire(piece);
-                    }}
                     className={`relative aspect-square rounded-xl overflow-hidden border-2 select-none transition-all duration-200 ${
                       state === "available" && isLoggedIn
                         ? isDragging
@@ -414,14 +422,14 @@ export default function PlayPage() {
                           : "border-primary/50 hover:border-primary hover:shadow-lg hover:scale-105 cursor-grab ring-1 ring-primary/20"
                         : state === "placed"
                         ? "border-green-500/50 cursor-default opacity-80"
-                        : "border-dashed border-muted-foreground/30 opacity-50 cursor-pointer hover:opacity-70"
+                         : "border-dashed border-muted-foreground/30 opacity-50 cursor-default"
                     }`}
                     title={
                       state === "available"
                         ? `Piece #${piece.position + 1} — drag to its matching cell`
                         : state === "placed"
                         ? `Piece #${piece.position + 1} — placed on board`
-                        : `Piece #${piece.position + 1} — click to acquire (demo)`
+                         : `Piece #${piece.position + 1} — get this piece from a share link`
                     }
                   >
                     {/* ── Image layer ── */}
@@ -486,15 +494,19 @@ export default function PlayPage() {
                       #{piece.position + 1}
                     </div>
 
-                    {/* Share button on placed pieces */}
-                    {state === "placed" && (
+                    {/* Every piece can be sent by link; clicking this control never acquires it. */}
+                    {(
                       <button
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity z-10"
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/45 flex items-center justify-center opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity z-10"
                         onClick={(e) => { e.stopPropagation(); handleShare(piece); }}
-                        title="Share this piece"
+                        title="Copy share link for this piece"
+                        aria-label={`Copy share link for piece ${piece.position + 1}`}
                       >
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
-                          <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8M16 6l-4-4-4 4M12 2v13"/>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.3">
+                          <circle cx="18" cy="5" r="3"/>
+                          <circle cx="6" cy="12" r="3"/>
+                          <circle cx="18" cy="19" r="3"/>
+                          <path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>
                         </svg>
                       </button>
                     )}

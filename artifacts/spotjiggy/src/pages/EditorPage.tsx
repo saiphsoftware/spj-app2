@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useCreatePuzzle, useGetPuzzle, useUpdatePuzzle, usePublishPuzzle } from "@workspace/api-client-react";
+import { useCreatePuzzle, useGetPuzzle, useUpdatePuzzle, usePublishPuzzle, getGetPuzzleQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,7 +27,7 @@ export default function EditorPage() {
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
 
   const { data: puzzle } = useGetPuzzle(isNew ? "" : id, {
-    query: { enabled: !isNew && !!id },
+    query: { enabled: !isNew && !!id, queryKey: getGetPuzzleQueryKey(isNew ? "" : id) },
   });
 
   useEffect(() => {

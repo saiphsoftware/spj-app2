@@ -1,13 +1,13 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useListPackages, useGetMyStats } from "@workspace/api-client-react";
+import { useListPackages, useGetMyStats, getGetMyStatsQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function StorePage() {
   const { isLoggedIn } = useAuth();
   const { data: packages, isLoading } = useListPackages();
-  const { data: myStats } = useGetMyStats({ query: { enabled: isLoggedIn } });
+  const { data: myStats } = useGetMyStats({ query: { enabled: isLoggedIn, queryKey: getGetMyStatsQueryKey() } });
 
   return (
     <Layout>
