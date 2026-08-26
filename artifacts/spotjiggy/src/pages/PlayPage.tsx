@@ -15,7 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 
 // ─── localStorage helpers for acquired pieces ────────────────────────────────
 function getAcquiredKey(puzzleId: string) {
-  return `spotjiggy:acquired:${puzzleId}`;
+  // Versioned after a data reset so stale browser progress cannot reappear.
+  return `spotjiggy:acquired:v2:${puzzleId}`;
 }
 function loadAcquired(puzzleId: string): Set<string> {
   try {
