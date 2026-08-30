@@ -3,11 +3,103 @@ import { Link, useLocation } from "wouter";
 import { Layout } from "@/components/Layout";
 import { useBucket, type BucketPiece } from "@/context/BucketContext";
 import { useToast } from "@/hooks/use-toast";
+import { useGetPiece, useGetPuzzle, getGetPieceQueryKey, getGetPuzzleQueryKey } from "@workspace/api-client-react";
+import { FormEvent, useEffect, useState } from "react";
+
+function extractPieceCode(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  try {
+    const url = new URL(trimmed, window.location.origin);
+    const queryPiece = url.searchParams.get("piece");
+    if (queryPiece) return queryPiece;
+
+    const pathMatch = url.pathname.match(/\/play\/piece\/([^/]+)/);
+    if (pathMatch) return decodeURIComponent(pathMatch[1]);
+  } catch {
+    // Treat a non-URL value as a raw piece code below.
+  }
+
+  return trimmed;
+}
 
 export default function BucketPage() {
   const [, navigate] = useLocation();
-  const { pieces, movePieceToPuzzle } = useBucket();
+  const { pieces, addPiece: addToBucket, movePieceToPuzzle } = useBucket();
   const { toast } = useToast();
+  const [code, setCode] = useState("");
+  const [submittedCode, setSubmittedCode] = useState("");
+  const pieceCode = extractPieceCode(submittedCode);
+  const { data: sharedPiece, isFetching: isLookingUpPiece, error: pieceError } = useGetPiece(pieceCode, {
+    query: {
+      enabled: !!pieceCode,
+      queryKey: getGetPieceQueryKey(pieceCode),
+    },
+  });
+  const { data: sharedPuzzle } = useGetPuzzle(sharedPiece?.puzzleId ?? "", {
+    query: {
+      enabled: !!sharedPiece?.puzzleId,
+      queryKey: getGetPuzzleQueryKey(sharedPiece?.puzzleId ?? ""),
+    },
+  });
+
+  useEffect(() => {
+    if (!submittedCode || isLookingUpPiece) return;
+
+    if (pieceError || !sharedPiece) {
+      setSubmittedCode("");
+      toast({
+        title: "That piece code is not valid.",
+        description: "Check the code or paste the complete share link.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!sharedPuzzle || !sharedPiece.puzzleId) return;
+
+    setSubmittedCode("");
+    setCode("");
+
+    if ((sharedPiece.collected?.length ?? 0) > 0) {
+      toast({ title: "That piece has already been used." });
+      return;
+    }
+
+    if (pieces.some((piece) => piece.id === sharedPiece.id)) {
+      toast({ title: "That piece is already in your Bucket." });
+      return;
+    }
+
+    addToBucket({
+      id: sharedPiece.id,
+      puzzleId: sharedPiece.puzzleId,
+      puzzleTitle: sharedPuzzle.message || "Untitled Puzzle",
+      puzzleImage: sharedPuzzle.image,
+      pieceImage: sharedPiece.image || sharedPuzzle.image,
+      position: sharedPiece.position,
+      addedAt: Date.now(),
+    });
+    toast({
+      title: `Piece #${sharedPiece.position + 1} added to your Bucket`,
+      description: "Click it below to add it to your puzzle hand.",
+    });
+  }, [addToBucket, isLookingUpPiece, pieceError, pieces, sharedPiece, sharedPuzzle, submittedCode, toast]);
+
+  const handleCodeSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextCode = extractPieceCode(code);
+    if (!nextCode) {
+      toast({
+        title: "Enter a piece code first.",
+        description: "You can enter a code or paste a share link.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSubmittedCode(nextCode);
+  };
 
   const handleAddToPuzzle = (piece: BucketPiece) => {
     movePieceToPuzzle(piece);
@@ -35,6 +127,39 @@ export default function BucketPage() {
             {pieces.length} {pieces.length === 1 ? "piece" : "pieces"}
           </span>
         </motion.div>
+
+        <motion.form
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          onSubmit={handleCodeSubmit}
+          className="mb-8 rounded-3xl border border-primary/20 bg-primary/[0.04] p-5 sm:p-6"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <label htmlFor="piece-code" className="block text-sm font-semibold text-foreground">
+                Have a piece code?
+              </label>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Enter the code or paste the share link someone sent you.
+              </p>
+              <input
+                id="piece-code"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                placeholder="Paste a piece code or share link"
+                className="mt-3 h-11 w-full rounded-xl border border-input bg-card px-3 text-sm text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                autoComplete="off"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isLookingUpPiece}
+              className="h-11 shrink-0 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLookingUpPiece ? "Checking..." : "Add to Bucket"}
+            </button>
+          </div>
+        </motion.form>
 
         {pieces.length === 0 ? (
           <motion.div
