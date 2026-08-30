@@ -5,9 +5,9 @@ import { useResetPassword } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function ResetPasswordPage() {
-  const [location, navigate] = useLocation();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
-  const token = new URLSearchParams(location.split("?")[1] ?? "").get("token") ?? "";
+  const token = new URLSearchParams(window.location.search).get("token") ?? "";
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
