@@ -5,9 +5,14 @@ import crypto from "crypto";
 import {
   RegisterBody,
   LoginBody,
+  ForgotPasswordBody,
+  ResetPasswordBody,
 } from "@workspace/api-zod";
 
 const router = Router();
+const DEMO_EMAIL = "demo@spotjiggy.com";
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
+const resetTokens = new Map<string, { sub: string; expiresAt: number }>();
 
 function hashPassword(pw: string): string {
   return crypto.createHash("sha256").update(pw + "spotjiggy_salt").digest("hex");
@@ -73,6 +78,65 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
   res.json({ user: users[0], token: makeToken(users[0].sub) });
+});
+
+router.post("/auth/forgot-password", async (req, res): Promise<void> => {
+  const parsed = ForgotPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const users = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+
+  // The demo account intentionally bypasses email verification so it remains
+  // usable in environments where no mail provider is configured.
+  if (email === DEMO_EMAIL && users.length > 0) {
+    const token = crypto.randomBytes(32).toString("hex");
+    resetTokens.set(token, {
+      sub: users[0].sub,
+      expiresAt: Date.now() + RESET_TOKEN_TTL_MS,
+    });
+    res.json({
+      success: true,
+      requiresVerification: false,
+      message: "Demo reset link created.",
+      demoResetToken: token,
+    });
+    return;
+  }
+
+  // Keep the response intentionally generic for non-demo addresses. A mail
+  // provider can be connected later to deliver a token without changing this
+  // public contract.
+  res.json({
+    success: true,
+    requiresVerification: true,
+    message: "Email verification is required to reset this account.",
+  });
+});
+
+router.post("/auth/reset-password", async (req, res): Promise<void> => {
+  const parsed = ResetPasswordBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const reset = resetTokens.get(parsed.data.token);
+  if (!reset || reset.expiresAt < Date.now()) {
+    if (reset) resetTokens.delete(parsed.data.token);
+    res.status(400).json({ error: "This reset link is invalid or expired." });
+    return;
+  }
+
+  await db.update(usersTable)
+    .set({ passwordHash: hashPassword(parsed.data.password) })
+    .where(eq(usersTable.sub, reset.sub));
+  resetTokens.delete(parsed.data.token);
+
+  res.json({ success: true, message: "Password updated. You can sign in now." });
 });
 
 router.post("/auth/logout", async (_req, res): Promise<void> => {

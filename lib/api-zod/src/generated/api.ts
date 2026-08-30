@@ -55,6 +55,39 @@ export const LoginResponse = zod.object({
 
 
 /**
+ * @summary Start a password reset
+ */
+export const ForgotPasswordBody = zod.object({
+  "email": zod.string().email()
+})
+
+export const ForgotPasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "requiresVerification": zod.boolean(),
+  "message": zod.string(),
+  "demoResetToken": zod.string().nullish()
+})
+
+
+/**
+ * @summary Set a new password using a reset token
+ */
+export const resetPasswordBodyPasswordMin = 6;
+
+
+
+export const ResetPasswordBody = zod.object({
+  "token": zod.string(),
+  "password": zod.string().min(resetPasswordBodyPasswordMin)
+})
+
+export const ResetPasswordResponse = zod.object({
+  "success": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
  * @summary Get current authenticated user
  */
 export const GetMeResponse = zod.object({

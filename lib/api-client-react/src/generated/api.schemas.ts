@@ -21,6 +21,29 @@ export interface LoginInput {
   password: string;
 }
 
+export interface ForgotPasswordInput {
+  email: string;
+}
+
+export interface ForgotPasswordResult {
+  success: boolean;
+  requiresVerification: boolean;
+  message: string;
+  /** @nullable */
+  demoResetToken?: string | null;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  /** @minLength 6 */
+  password: string;
+}
+
+export interface ResetPasswordResult {
+  success: boolean;
+  message: string;
+}
+
 export type UserType = typeof UserType[keyof typeof UserType];
 
 
