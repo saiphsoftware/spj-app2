@@ -65,7 +65,8 @@ router.get("/users/me/puzzles", async (req, res): Promise<void> => {
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const allPuzzles = await db.select().from(puzzlesTable).where(eq(puzzlesTable.creatorSub, sub));
-  const active = allPuzzles.filter(p => p.status === "open" || p.status === "pending");
+  const drafts = allPuzzles.filter(p => p.status === "pending");
+  const active = allPuzzles.filter(p => p.status === "open");
   const closed = allPuzzles.filter(p => p.status === "closed");
 
   const mapPuzzle = (p: any) => ({
@@ -76,7 +77,7 @@ router.get("/users/me/puzzles", async (req, res): Promise<void> => {
     completionCount: p.completionCount, cut: { type: p.cutType, count: p.cutCount },
   });
 
-  res.json({ active: active.map(mapPuzzle), closed: closed.map(mapPuzzle) });
+  res.json({ drafts: drafts.map(mapPuzzle), active: active.map(mapPuzzle), closed: closed.map(mapPuzzle) });
 });
 
 router.get("/users/:uid", async (req, res): Promise<void> => {

@@ -671,8 +671,12 @@ components:
 
     MyPuzzlesResult:
       type: object
-      required: [active, closed]
+      required: [drafts, active, closed]
       properties:
+        drafts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Puzzle"
         active:
           type: array
           items:
@@ -775,6 +779,11 @@ components:
           enum: [solo, group]
         cut:
           $ref: "#/components/schemas/PuzzleCut"
+        pieceMessages:
+          type: array
+          description: Optional message for each piece, matched by zero-based position.
+          items:
+            type: string
         timeLimit:
           type: ["integer", "null"]
         completionBadge:
@@ -791,6 +800,17 @@ components:
       properties:
         message:
           type: string
+        pieceMessages:
+          type: array
+          description: Optional messages for pieces, matched by zero-based position.
+          items:
+            type: object
+            required: [position, message]
+            properties:
+              position:
+                type: integer
+              message:
+                type: string
         timeLimit:
           type: ["integer", "null"]
 
@@ -806,7 +826,7 @@ components:
 
     Piece:
       type: object
-      required: [id, image, position, limit, collected]
+      required: [id, image, position, limit, message, collected]
       properties:
         id:
           type: string
@@ -816,6 +836,8 @@ components:
           type: integer
         limit:
           type: integer
+        message:
+          type: string
         collected:
           type: array
           items:

@@ -63,6 +63,7 @@ async function getPuzzleWithPieces(puzzleId: string) {
       image: p.image,
       position: p.position,
       limit: p.limit,
+       message: p.message,
       puzzleId: p.puzzleId,
       shareUrl: buildShareUrl(p.id),
       collected: collectionsByPiece.get(p.id) ?? [],
@@ -116,7 +117,7 @@ router.post("/puzzles", async (req, res): Promise<void> => {
   const parsed = CreatePuzzleBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
-  const { image, message, type, cut, timeLimit, completionBadge, participationBadge } = parsed.data;
+  const { image, message, type, cut, timeLimit, completionBadge, participationBadge, pieceMessages } = parsed.data;
   const now = Math.floor(Date.now() / 1000);
   const puzzleId = crypto.randomUUID();
 
@@ -157,6 +158,7 @@ router.post("/puzzles", async (req, res): Promise<void> => {
       image,
       position: i,
       limit: pieceLimit,
+      message: pieceMessages?.[i] ?? "",
     });
   }
 
@@ -209,6 +211,13 @@ router.patch("/puzzles/:id", async (req, res): Promise<void> => {
   if (parsed.data.timeLimit !== undefined) updates.timeLimit = parsed.data.timeLimit;
 
   await db.update(puzzlesTable).set(updates).where(eq(puzzlesTable.id, req.params.id));
+  if (parsed.data.pieceMessages) {
+    for (const pieceMessage of parsed.data.pieceMessages) {
+      await db.update(piecesTable)
+        .set({ message: pieceMessage.message })
+        .where(and(eq(piecesTable.puzzleId, req.params.id), eq(piecesTable.position, pieceMessage.position)));
+    }
+  }
   const updated = await getPuzzleWithPieces(req.params.id);
   res.json(updated);
 });
@@ -221,6 +230,12 @@ router.delete("/puzzles/:id", async (req, res): Promise<void> => {
   if (puzzles.length === 0) { res.status(404).json({ error: "Not found" }); return; }
   if (puzzles[0].creatorSub !== sub) { res.status(403).json({ error: "Forbidden" }); return; }
 
+  const puzzlePieces = await db.select({ id: piecesTable.id }).from(piecesTable).where(eq(piecesTable.puzzleId, req.params.id));
+  for (const piece of puzzlePieces) {
+    await db.delete(pieceCollectionsTable).where(eq(pieceCollectionsTable.pieceId, piece.id));
+  }
+  await db.delete(piecesTable).where(eq(piecesTable.puzzleId, req.params.id));
+  await db.delete(puzzleParticipantsTable).where(eq(puzzleParticipantsTable.puzzleId, req.params.id));
   await db.delete(puzzlesTable).where(eq(puzzlesTable.id, req.params.id));
   res.status(204).send();
 });

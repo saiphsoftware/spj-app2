@@ -5,9 +5,12 @@
  * SpotJiggy API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { PuzzleUpdatePieceMessagesItem } from './puzzleUpdatePieceMessagesItem';
 
 export interface PuzzleUpdate {
   message?: string;
+  /** Optional messages for pieces, matched by zero-based position. */
+  pieceMessages?: PuzzleUpdatePieceMessagesItem[];
   /** @nullable */
   timeLimit?: number | null;
 }

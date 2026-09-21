@@ -150,6 +150,7 @@ export interface Piece {
   image: string;
   position: number;
   limit: number;
+  message: string;
   collected: CollectedBy[];
   puzzleId?: string;
   shareUrl?: string;
@@ -191,6 +192,7 @@ export interface Puzzle {
 }
 
 export interface MyPuzzlesResult {
+  drafts: Puzzle[];
   active: Puzzle[];
   closed: Puzzle[];
 }
@@ -220,14 +222,23 @@ export interface PuzzleInput {
   message: string;
   type: PuzzleInputType;
   cut: PuzzleCut;
+  /** Optional message for each piece, matched by zero-based position. */
+  pieceMessages?: string[];
   /** @nullable */
   timeLimit?: number | null;
   completionBadge?: BadgeInput | null;
   participationBadge?: BadgeInput | null;
 }
 
+export type PuzzleUpdatePieceMessagesItem = {
+  position: number;
+  message: string;
+};
+
 export interface PuzzleUpdate {
   message?: string;
+  /** Optional messages for pieces, matched by zero-based position. */
+  pieceMessages?: PuzzleUpdatePieceMessagesItem[];
   /** @nullable */
   timeLimit?: number | null;
 }

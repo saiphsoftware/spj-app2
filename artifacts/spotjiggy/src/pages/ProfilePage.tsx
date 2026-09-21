@@ -1,7 +1,7 @@
 import { useParams } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useGetUserProfile, useListUserActivityFeed, useGetMyStats, getGetMyStatsQueryKey } from "@workspace/api-client-react";
+import { useGetUserProfile, useListUserActivityFeed, useGetMyStats, useGetMe, useGetMyPuzzles, getGetMyStatsQueryKey, getGetMeQueryKey, getGetMyPuzzlesQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 
 function timeAgo(ts: number): string {
@@ -26,7 +26,12 @@ export default function ProfilePage() {
 
   const { data: profile, isLoading } = useGetUserProfile(uid);
   const { data: activity } = useListUserActivityFeed(uid);
+  const { data: me } = useGetMe({ query: { enabled: isLoggedIn, queryKey: getGetMeQueryKey() } });
   const { data: myStats } = useGetMyStats({ query: { enabled: isLoggedIn, queryKey: getGetMyStatsQueryKey() } });
+  const isOwnProfile = !!me && me.sub === uid;
+  const { data: myPuzzles } = useGetMyPuzzles({
+    query: { enabled: isOwnProfile, queryKey: getGetMyPuzzlesQueryKey() },
+  });
 
   if (isLoading) {
     return (
@@ -135,6 +140,47 @@ export default function ProfilePage() {
                 </motion.div>
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {isOwnProfile && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            className="bg-card border border-card-border rounded-2xl p-5 mb-5"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-foreground">Draft Puzzles</h2>
+              <span className="text-xs text-muted-foreground">{myPuzzles?.drafts?.length ?? 0} saved</span>
+            </div>
+            {myPuzzles?.drafts?.length ? (
+              <div className="space-y-2">
+                {myPuzzles.drafts.map((draft) => (
+                  <a
+                    key={draft.id}
+                    href={`/edit/${draft.id}`}
+                    className="flex items-center gap-3 rounded-xl border border-border bg-background p-2.5 transition-colors hover:border-primary/40 hover:bg-muted"
+                  >
+                    <img
+                      src={draft.image}
+                      alt=""
+                      className="h-14 w-20 rounded-lg object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).src = "https://picsum.photos/seed/draft/160/100"; }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground">{draft.message || "Untitled Puzzle"}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{draft.cut.count} pieces · Saved draft</p>
+                    </div>
+                    <span className="text-xs font-semibold text-primary">Continue</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-border px-4 py-5 text-center text-sm text-muted-foreground">
+                Saved drafts will appear here.
+              </p>
+            )}
           </motion.div>
         )}
 

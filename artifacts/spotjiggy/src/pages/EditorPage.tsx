@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useCreatePuzzle, useGetPuzzle, useUpdatePuzzle, usePublishPuzzle, getGetPuzzleQueryKey } from "@workspace/api-client-react";
+import { useCreatePuzzle, useGetPuzzle, useUpdatePuzzle, usePublishPuzzle, useDeletePuzzle, getGetPuzzleQueryKey, getGetMyPuzzlesQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const CUT_OPTIONS = [
   { type: "rect", counts: [4, 9, 16, 25], label: "Grid" },
@@ -18,6 +19,7 @@ export default function EditorPage() {
   const [, navigate] = useLocation();
   const { isLoggedIn } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [image, setImage] = useState("https://picsum.photos/seed/puzzle1/800/600");
   const [message, setMessage] = useState("");
@@ -25,6 +27,7 @@ export default function EditorPage() {
   const [cutType, setCutType] = useState<"rect" | "column" | "broken">("rect");
   const [cutCount, setCutCount] = useState(9);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
+  const [pieceMessages, setPieceMessages] = useState<Record<number, string>>({});
 
   const { data: puzzle } = useGetPuzzle(isNew ? "" : id, {
     query: { enabled: !isNew && !!id, queryKey: getGetPuzzleQueryKey(isNew ? "" : id) },
@@ -38,6 +41,11 @@ export default function EditorPage() {
       setCutType(puzzle.cut.type as any);
       setCutCount(puzzle.cut.count);
       setTimeLimit(puzzle.timeLimit ?? null);
+      setPieceMessages(
+        Object.fromEntries(
+          puzzle.pieces.map((piece: any) => [piece.position, piece.message ?? ""]),
+        ),
+      );
     }
   }, [puzzle]);
 
@@ -53,7 +61,10 @@ export default function EditorPage() {
 
   const updateMutation = useUpdatePuzzle({
     mutation: {
-      onSuccess: () => toast({ title: "Changes saved!" }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMyPuzzlesQueryKey() });
+        toast({ title: "Changes saved!" });
+      },
       onError: () => toast({ title: "Failed to save", variant: "destructive" }),
     },
   });
@@ -61,10 +72,22 @@ export default function EditorPage() {
   const publishMutation = usePublishPuzzle({
     mutation: {
       onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMyPuzzlesQueryKey() });
         toast({ title: "Puzzle published! Players can now collect pieces." });
         navigate("/");
       },
       onError: () => toast({ title: "Failed to publish", variant: "destructive" }),
+    },
+  });
+
+  const deleteMutation = useDeletePuzzle({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetMyPuzzlesQueryKey() });
+        toast({ title: "Draft discarded." });
+        navigate("/");
+      },
+      onError: () => toast({ title: "Could not discard this draft", variant: "destructive" }),
     },
   });
 
@@ -81,10 +104,27 @@ export default function EditorPage() {
   const handleSave = () => {
     if (isNew) {
       createMutation.mutate({
-        data: { image, message, type, cut: { type: cutType, count: cutCount }, timeLimit },
+        data: {
+          image,
+          message,
+          type,
+          cut: { type: cutType, count: cutCount },
+          timeLimit,
+          pieceMessages: Array.from({ length: cutCount }, (_, position) => pieceMessages[position] ?? ""),
+        },
       });
     } else {
-      updateMutation.mutate({ id, data: { message, timeLimit } });
+      updateMutation.mutate({
+        id,
+        data: {
+          message,
+          timeLimit,
+          pieceMessages: Object.entries(pieceMessages).map(([position, value]) => ({
+            position: Number(position),
+            message: value,
+          })),
+        },
+      });
     }
   };
 
@@ -94,6 +134,12 @@ export default function EditorPage() {
       return;
     }
     publishMutation.mutate({ id });
+  };
+
+  const handleDiscard = () => {
+    if (isNew || !id || puzzle?.status !== "pending") return;
+    if (!window.confirm("Discard this draft? This cannot be undone.")) return;
+    deleteMutation.mutate({ id });
   };
 
   const cols = cutType === "column" ? cutCount : Math.round(Math.sqrt(cutCount));
@@ -118,15 +164,26 @@ export default function EditorPage() {
               {createMutation.isPending || updateMutation.isPending ? "Saving..." : "Save Draft"}
             </motion.button>
             {!isNew && puzzle?.status === "pending" && (
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={handlePublish}
-                disabled={publishMutation.isPending}
-                className="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-xl text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {publishMutation.isPending ? "Publishing..." : "Publish"}
-              </motion.button>
+              <>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleDiscard}
+                  disabled={deleteMutation.isPending}
+                  className="px-4 py-2 border border-destructive/30 bg-card text-destructive font-medium rounded-xl text-sm hover:bg-destructive/5 transition-colors disabled:opacity-50"
+                >
+                  {deleteMutation.isPending ? "Discarding..." : "Discard Draft"}
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handlePublish}
+                  disabled={publishMutation.isPending || deleteMutation.isPending}
+                  className="px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-xl text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {publishMutation.isPending ? "Publishing..." : "Publish"}
+                </motion.button>
+              </>
             )}
           </div>
         </div>
@@ -193,6 +250,29 @@ export default function EditorPage() {
                   <p className="text-xs text-muted-foreground mt-1.5">
                     {type === "group" ? "Each piece can only be collected once — players must work together." : "Every player collects their own full set of pieces."}
                   </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Piece messages</label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Add a private note that players can open after they acquire that piece.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+                    {Array.from({ length: cutCount }, (_, position) => (
+                      <input
+                        key={position}
+                        type="text"
+                        value={pieceMessages[position] ?? ""}
+                        onChange={(e) => setPieceMessages((current) => ({
+                          ...current,
+                          [position]: e.target.value,
+                        }))}
+                        placeholder={`Piece #${position + 1} note`}
+                        aria-label={`Message for piece ${position + 1}`}
+                        className="w-full px-3 py-2 rounded-xl border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 <div>

@@ -8,6 +8,7 @@
 import type { Puzzle } from './puzzle';
 
 export interface MyPuzzlesResult {
+  drafts: Puzzle[];
   active: Puzzle[];
   closed: Puzzle[];
 }

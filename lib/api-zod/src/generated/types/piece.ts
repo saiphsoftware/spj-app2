@@ -12,6 +12,7 @@ export interface Piece {
   image: string;
   position: number;
   limit: number;
+  message: string;
   collected: CollectedBy[];
   puzzleId?: string;
   shareUrl?: string;

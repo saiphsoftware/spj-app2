@@ -36,6 +36,7 @@ export * from './puzzleInputType';
 export * from './puzzleStatus';
 export * from './puzzleType';
 export * from './puzzleUpdate';
+export * from './puzzleUpdatePieceMessagesItem';
 export * from './registerInput';
 export * from './resetPasswordInput';
 export * from './resetPasswordResult';

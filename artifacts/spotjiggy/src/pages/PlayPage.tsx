@@ -38,6 +38,7 @@ export default function PlayPage() {
   const [draggingPieceId, setDraggingPieceId] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<number | null>(null);
   const [shakingPieceId, setShakingPieceId] = useState<string | null>(null);
+  const [selectedMessagePiece, setSelectedMessagePiece] = useState<any | null>(null);
   const handledLinkRef = useRef<string | null>(null);
 
   const { data: puzzle, isLoading: puzzleLoading } = useGetPuzzle(id);
@@ -172,6 +173,19 @@ export default function PlayPage() {
     if (isPlaced) return "placed";
     if (acquired.has(piece.id)) return "available";
     return "not-acquired";
+  };
+
+  const canReadPieceMessage = (piece: any) =>
+    !!piece?.message &&
+    (acquired.has(piece.id) || (piece.collected ?? []).some((collection: any) => collection.by?.sub === getCurrentUserSub()));
+
+  const getCurrentUserSub = () => {
+    try {
+      const token = localStorage.getItem("spotjiggy_token");
+      return token ? atob(token).split(":")[0] : null;
+    } catch {
+      return null;
+    }
   };
 
   const placedCount = allPieces.filter((p) => getPieceState(p) === "placed").length;
@@ -349,6 +363,21 @@ export default function PlayPage() {
                           }`}
                         />
                       )}
+
+                       {piece && canReadPieceMessage(piece) && (
+                         <button
+                           type="button"
+                           onClick={(e) => { e.stopPropagation(); setSelectedMessagePiece(piece); }}
+                           className="absolute top-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md ring-2 ring-white/80 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary"
+                           title="Open piece message"
+                           aria-label={`Open message for piece ${piece.position + 1}`}
+                         >
+                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                             <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7A8.38 8.38 0 0 1 4 11.5a8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+                             <path d="M8 12h.01M12 12h.01M16 12h.01" />
+                           </svg>
+                         </button>
+                       )}
                     </div>
                   );
                 })}
@@ -522,6 +551,39 @@ export default function PlayPage() {
             )}
           </div>
         </div>
+
+        {selectedMessagePiece && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            role="presentation"
+            onClick={() => setSelectedMessagePiece(null)}
+          >
+            <div
+              className="relative w-full max-w-md rounded-2xl border border-card-border bg-card p-6 shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="piece-message-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedMessagePiece(null)}
+                className="absolute right-4 top-4 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                aria-label="Close piece message"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+              <h2 id="piece-message-title" className="pr-8 text-lg font-semibold text-foreground">
+                Message for piece #{selectedMessagePiece.position + 1}
+              </h2>
+              <p className="mt-3 whitespace-pre-wrap text-base leading-relaxed text-foreground">
+                {selectedMessagePiece.message}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Floating hint while dragging */}
         <AnimatePresence>

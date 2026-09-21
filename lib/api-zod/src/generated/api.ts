@@ -139,6 +139,7 @@ export const ListPuzzlesResponseItem = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -178,6 +179,7 @@ export const CreatePuzzleBody = zod.object({
   "type": zod.enum(['column', 'rect', 'broken']),
   "count": zod.number()
 }),
+  "pieceMessages": zod.array(zod.string()).optional().describe('Optional message for each piece, matched by zero-based position.'),
   "timeLimit": zod.number().nullish(),
   "completionBadge": zod.union([zod.object({
   "name": zod.string(),
@@ -225,6 +227,7 @@ export const ListTrendingPuzzlesResponseItem = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -284,6 +287,7 @@ export const GetPuzzleResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -331,6 +335,10 @@ export const UpdatePuzzleParams = zod.object({
 
 export const UpdatePuzzleBody = zod.object({
   "message": zod.string().optional(),
+  "pieceMessages": zod.array(zod.object({
+  "position": zod.number(),
+  "message": zod.string()
+})).optional().describe('Optional messages for pieces, matched by zero-based position.'),
   "timeLimit": zod.number().nullish()
 })
 
@@ -358,6 +366,7 @@ export const UpdatePuzzleResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -424,6 +433,7 @@ export const PublishPuzzleResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -482,6 +492,7 @@ export const ClosePuzzleResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -521,6 +532,7 @@ export const ListPuzzlePiecesResponseItem = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -547,6 +559,7 @@ export const GetPieceResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -574,6 +587,7 @@ export const CollectPieceResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -655,6 +669,7 @@ export const GetMyPiecesResponseItem = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -685,6 +700,56 @@ export const GetMyBadgesResponse = zod.array(GetMyBadgesResponseItem)
  * @summary Get puzzles created by current user
  */
 export const GetMyPuzzlesResponse = zod.object({
+  "drafts": zod.array(zod.object({
+  "id": zod.string(),
+  "image": zod.string(),
+  "message": zod.string(),
+  "type": zod.enum(['solo', 'group']),
+  "status": zod.enum(['pending', 'open', 'closed']),
+  "closeType": zod.enum(['completed', 'cancelled', 'timeout', 'null']).nullish(),
+  "completionBadge": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "image": zod.string(),
+  "description": zod.string().nullish()
+}),zod.null()]).optional(),
+  "participationBadge": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "image": zod.string(),
+  "description": zod.string().nullish()
+}),zod.null()]).optional(),
+  "pieces": zod.array(zod.object({
+  "id": zod.string(),
+  "image": zod.string(),
+  "position": zod.number(),
+  "limit": zod.number(),
+  "message": zod.string(),
+  "collected": zod.array(zod.object({
+  "by": zod.object({
+  "sub": zod.string(),
+  "name": zod.string(),
+  "avatar": zod.string()
+}),
+  "on": zod.number()
+})),
+  "puzzleId": zod.string().optional(),
+  "shareUrl": zod.string().optional()
+})),
+  "createdBy": zod.object({
+  "sub": zod.string(),
+  "name": zod.string(),
+  "avatar": zod.string()
+}),
+  "createdOn": zod.number(),
+  "timeLimit": zod.number().nullish(),
+  "closedOn": zod.number().nullish(),
+  "completionCount": zod.number(),
+  "cut": zod.object({
+  "type": zod.enum(['column', 'rect', 'broken']),
+  "count": zod.number()
+})
+})),
   "active": zod.array(zod.object({
   "id": zod.string(),
   "image": zod.string(),
@@ -709,6 +774,7 @@ export const GetMyPuzzlesResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),
@@ -758,6 +824,7 @@ export const GetMyPuzzlesResponse = zod.object({
   "image": zod.string(),
   "position": zod.number(),
   "limit": zod.number(),
+  "message": zod.string(),
   "collected": zod.array(zod.object({
   "by": zod.object({
   "sub": zod.string(),

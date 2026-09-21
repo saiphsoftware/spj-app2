@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useListPuzzles, useListTrendingPuzzles, useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useListPuzzles, useListTrendingPuzzles, useGetMe, useGetMyPuzzles, getGetMeQueryKey, getGetMyPuzzlesQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { PuzzleCard } from "@/components/PuzzleCard";
 import { useBucket } from "@/context/BucketContext";
@@ -10,6 +10,9 @@ export default function HomePage() {
   const { isLoggedIn } = useAuth();
   const { pieces: bucketPieces } = useBucket();
   const { data: me } = useGetMe({ query: { enabled: isLoggedIn, queryKey: getGetMeQueryKey() } });
+  const { data: myPuzzles } = useGetMyPuzzles({
+    query: { enabled: isLoggedIn, queryKey: getGetMyPuzzlesQueryKey() },
+  });
   const { data: puzzles, isLoading } = useListPuzzles({ status: "open" });
   const { data: trending } = useListTrendingPuzzles({ limit: 8 });
 
@@ -54,16 +57,22 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold text-foreground">Welcome back, {me.name.split(" ")[0]}</h1>
             <p className="text-muted-foreground text-sm mt-0.5">Discover new puzzles to collect</p>
           </div>
-          <Link href="/edit/new">
+          <Link href={myPuzzles?.drafts?.[0] ? `/edit/${myPuzzles.drafts[0].id}` : "/edit/new"}>
             <motion.button
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl text-sm hover:opacity-90 transition-opacity"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Create Puzzle
+              {myPuzzles?.drafts?.length ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              )}
+              {myPuzzles?.drafts?.length ? "Continue Draft Puzzle" : "Create Puzzle"}
             </motion.button>
           </Link>
         </motion.div>
@@ -164,13 +173,13 @@ export default function HomePage() {
             <h3 className="font-semibold text-foreground mb-1">No puzzles yet</h3>
             <p className="text-muted-foreground text-sm">Be the first to create one!</p>
             {isLoggedIn && (
-              <Link href="/edit/new">
+              <Link href={myPuzzles?.drafts?.[0] ? `/edit/${myPuzzles.drafts[0].id}` : "/edit/new"}>
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   className="mt-4 px-5 py-2 bg-primary text-primary-foreground font-semibold rounded-xl text-sm hover:opacity-90 transition-opacity"
                 >
-                  Create a Puzzle
+                  {myPuzzles?.drafts?.length ? "Continue Draft Puzzle" : "Create a Puzzle"}
                 </motion.button>
               </Link>
             )}

@@ -10,6 +10,7 @@ export const piecesTable = pgTable("pieces", {
   image: text("image").notNull(),
   position: integer("position").notNull(),
   limit: integer("limit").notNull().default(1),
+  message: text("message").notNull().default(""),
 });
 
 export const pieceCollectionsTable = pgTable("piece_collections", {

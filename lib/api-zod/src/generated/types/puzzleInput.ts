@@ -14,6 +14,8 @@ export interface PuzzleInput {
   message: string;
   type: PuzzleInputType;
   cut: PuzzleCut;
+  /** Optional message for each piece, matched by zero-based position. */
+  pieceMessages?: string[];
   /** @nullable */
   timeLimit?: number | null;
   completionBadge?: BadgeInput | null;
