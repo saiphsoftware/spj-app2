@@ -6,12 +6,7 @@ import { useCreatePuzzle, useGetPuzzle, useUpdatePuzzle, usePublishPuzzle, useDe
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-
-const CUT_OPTIONS = [
-  { type: "rect", counts: [4, 9, 16, 25], label: "Grid" },
-  { type: "column", counts: [3, 4, 5, 6], label: "Strips" },
-  { type: "broken", counts: [9, 16, 25], label: "Jigsaw" },
-];
+import { CUT_OPTIONS, getCutDimensions, getTriangleClipPath, type CutType } from "@/lib/puzzleCuts";
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,7 +19,7 @@ export default function EditorPage() {
   const [image, setImage] = useState("https://picsum.photos/seed/puzzle1/800/600");
   const [message, setMessage] = useState("");
   const [type, setType] = useState<"solo" | "group">("solo");
-  const [cutType, setCutType] = useState<"rect" | "column" | "broken">("rect");
+  const [cutType, setCutType] = useState<CutType>("rect");
   const [cutCount, setCutCount] = useState(9);
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
   const [pieceMessages, setPieceMessages] = useState<Record<number, string>>({});
@@ -142,8 +137,9 @@ export default function EditorPage() {
     deleteMutation.mutate({ id });
   };
 
-  const cols = cutType === "column" ? cutCount : Math.round(Math.sqrt(cutCount));
-  const rows = cutType === "column" ? 1 : Math.ceil(cutCount / cols);
+  const { cols, rows } = getCutDimensions(cutType, cutCount);
+  const selectedCutOption = CUT_OPTIONS.find((option) => option.type === cutType) ?? CUT_OPTIONS[0];
+  const selectedCountIndex = Math.max(0, selectedCutOption.counts.indexOf(cutCount as never));
 
   return (
     <Layout>
@@ -275,39 +271,63 @@ export default function EditorPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">Cut Style</label>
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {CUT_OPTIONS.map(opt => (
-                      <button
-                        key={opt.type}
-                        onClick={() => { setCutType(opt.type as any); setCutCount(opt.counts[1]); }}
-                        className={`py-2 rounded-xl text-sm font-medium border transition-all ${
-                          cutType === opt.type
-                            ? "bg-secondary text-white border-secondary"
-                            : "bg-background border-input text-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-2">Cut Style</label>
+                    <div className="grid grid-cols-3 gap-2 mb-4">
+                      {CUT_OPTIONS.map((option) => (
+                        <button
+                          key={option.type}
+                          onClick={() => {
+                            setCutType(option.type);
+                            if (isNew) setCutCount(option.defaultCount);
+                          }}
+                          className={`py-2 rounded-xl text-sm font-medium border transition-all ${
+                            cutType === option.type
+                              ? "bg-secondary text-white border-secondary"
+                              : "bg-background border-input text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {isNew ? (
+                      <>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label htmlFor="piece-count" className="text-sm font-medium text-foreground">Pieces</label>
+                          <span className="text-sm font-bold text-primary">{cutCount}</span>
+                        </div>
+                        <input
+                          id="piece-count"
+                          type="range"
+                          min={0}
+                          max={selectedCutOption.counts.length - 1}
+                          step={1}
+                          value={selectedCountIndex}
+                          onChange={(event) => setCutCount(selectedCutOption.counts[Number(event.target.value)])}
+                          className="w-full accent-primary"
+                          aria-label={`${selectedCutOption.label} piece count`}
+                          aria-valuetext={`${cutCount} pieces`}
+                        />
+                        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+                          <span>{selectedCutOption.counts[0]}</span>
+                          <span>{selectedCutOption.counts[selectedCutOption.counts.length - 1]}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {cutType === "rect"
+                            ? "Grid layouts stay column-dominant when the count is not square."
+                            : cutType === "column"
+                            ? "Creates one row of vertical strips."
+                            : "Creates alternating up and down triangle pieces."}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        This draft has {cutCount} pieces. Piece count and cut style are fixed after the puzzle is saved.
+                      </p>
+                    )}
                   </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {CUT_OPTIONS.find(o => o.type === cutType)?.counts.map(c => (
-                      <button
-                        key={c}
-                        onClick={() => setCutCount(c)}
-                        className={`px-3 py-1 rounded-lg text-sm border transition-all ${
-                          cutCount === c
-                            ? "bg-accent text-foreground border-accent font-semibold"
-                            : "bg-background border-input hover:bg-muted"
-                        }`}
-                      >
-                        {c} pcs
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -324,9 +344,27 @@ export default function EditorPage() {
                     onError={(e) => { (e.target as HTMLImageElement).src = "https://picsum.photos/seed/default/800/600"; }}
                   />
                 )}
-                <div className="absolute inset-0 pointer-events-none" style={{
-                  backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent calc(${100/rows}% - 1px), rgba(255,255,255,0.6) calc(${100/rows}% - 1px), rgba(255,255,255,0.6) ${100/rows}%), repeating-linear-gradient(90deg, transparent, transparent calc(${100/cols}% - 1px), rgba(255,255,255,0.6) calc(${100/cols}% - 1px), rgba(255,255,255,0.6) ${100/cols}%)`,
-                }} />
+                {cutType === "broken" ? (
+                  <div
+                    className="absolute inset-0 grid pointer-events-none"
+                    style={{
+                      gridTemplateColumns: `repeat(${cols}, 1fr)`,
+                      gridTemplateRows: `repeat(${rows}, 1fr)`,
+                    }}
+                  >
+                    {Array.from({ length: cutCount }).map((_, position) => (
+                      <div
+                        key={position}
+                        className="border border-white/70 bg-white/5"
+                        style={{ clipPath: getTriangleClipPath(position) }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 pointer-events-none" style={{
+                    backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent calc(${100/rows}% - 1px), rgba(255,255,255,0.6) calc(${100/rows}% - 1px), rgba(255,255,255,0.6) ${100/rows}%), repeating-linear-gradient(90deg, transparent, transparent calc(${100/cols}% - 1px), rgba(255,255,255,0.6) calc(${100/cols}% - 1px), rgba(255,255,255,0.6) ${100/cols}%)`,
+                  }} />
+                )}
               </div>
               <div className="mt-3 flex items-center gap-3 text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">{cutCount} pieces</span>

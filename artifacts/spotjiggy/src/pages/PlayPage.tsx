@@ -14,6 +14,7 @@ import { useBucket } from "@/context/BucketContext";
 import { addAcquiredPiece, loadAcquired, saveAcquired } from "@/lib/pieceStorage";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { getCutDimensions, getTriangleClipPath } from "@/lib/puzzleCuts";
 
 // ─── Piece state legend ───────────────────────────────────────────────────────
 // State 1 – "acquired + available"  : user has the piece, not yet placed → COLOR, draggable
@@ -158,12 +159,8 @@ export default function PlayPage() {
   }
 
   const allPieces: any[] = pieces ?? puzzle.pieces ?? [];
-  const cols =
-    puzzle.cut.type === "column"
-      ? puzzle.cut.count
-      : Math.round(Math.sqrt(puzzle.cut.count));
-  const rows =
-    puzzle.cut.type === "column" ? 1 : Math.ceil(puzzle.cut.count / cols);
+  const { cols, rows } = getCutDimensions(puzzle.cut.type, puzzle.cut.count);
+  const isTriangleCut = puzzle.cut.type === "broken";
 
   const pieceByPosition = new Map<number, any>(allPieces.map((p) => [p.position, p]));
 
@@ -298,7 +295,7 @@ export default function PlayPage() {
                   gridTemplateRows: `repeat(${rows}, 1fr)`,
                 }}
               >
-                {Array.from({ length: cols * rows }).map((_, cellIdx) => {
+                {Array.from({ length: puzzle.cut.count }).map((_, cellIdx) => {
                   const col = cellIdx % cols;
                   const row = Math.floor(cellIdx / cols);
                   const piece = pieceByPosition.get(cellIdx);
@@ -310,7 +307,8 @@ export default function PlayPage() {
                   return (
                     <div
                       key={cellIdx}
-                      className="relative border border-white/10"
+                      className={`relative border border-white/10 ${isTriangleCut ? "bg-black/5" : ""}`}
+                      style={{ clipPath: isTriangleCut ? getTriangleClipPath(cellIdx) : undefined }}
                       onDragOver={(e) => { e.preventDefault(); setDragOverCell(cellIdx); }}
                       onDragLeave={(e) => {
                         if (!e.currentTarget.contains(e.relatedTarget as Node))
@@ -332,6 +330,7 @@ export default function PlayPage() {
                               backgroundSize: bgSize,
                               backgroundPosition: bgPos(col, row),
                               backgroundRepeat: "no-repeat",
+                               clipPath: isTriangleCut ? getTriangleClipPath(cellIdx) : undefined,
                             }}
                           />
                         )}
@@ -368,7 +367,11 @@ export default function PlayPage() {
                          <button
                            type="button"
                            onClick={(e) => { e.stopPropagation(); setSelectedMessagePiece(piece); }}
-                           className="absolute top-1 right-1 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md ring-2 ring-white/80 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary"
+                           className={`absolute z-10 flex h-7 w-7 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-md ring-2 ring-white/80 transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary ${
+                             isTriangleCut
+                               ? "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+                               : "right-1 top-1"
+                           }`}
                            title="Open piece message"
                            aria-label={`Open message for piece ${piece.position + 1}`}
                          >
@@ -444,7 +447,7 @@ export default function PlayPage() {
                       setTimeout(() => ghost.remove(), 0);
                     }}
                     onDragEnd={() => { setDraggingPieceId(null); setDragOverCell(null); }}
-                    className={`relative aspect-square rounded-xl overflow-hidden border-2 select-none transition-all duration-200 ${
+                    className={`relative aspect-square overflow-hidden border-2 select-none transition-all duration-200 ${
                       state === "available" && isLoggedIn
                         ? isDragging
                           ? "border-primary opacity-40 scale-95 cursor-grabbing"
@@ -452,7 +455,8 @@ export default function PlayPage() {
                         : state === "placed"
                         ? "border-green-500/50 cursor-default opacity-80"
                          : "border-dashed border-muted-foreground/30 opacity-50 cursor-default"
-                    }`}
+                    } ${isTriangleCut ? "rounded-none" : "rounded-xl"}`}
+                    style={{ clipPath: isTriangleCut ? getTriangleClipPath(piece.position) : undefined }}
                     title={
                       state === "available"
                         ? `Piece #${piece.position + 1} — drag to its matching cell`
@@ -471,6 +475,7 @@ export default function PlayPage() {
                           backgroundSize: bgSize,
                           backgroundPosition: bgPos(col, row),
                           backgroundRepeat: "no-repeat",
+                          clipPath: isTriangleCut ? getTriangleClipPath(piece.position) : undefined,
                         }}
                       />
                     ) : (
@@ -482,6 +487,7 @@ export default function PlayPage() {
                           backgroundSize: bgSize,
                           backgroundPosition: bgPos(col, row),
                           backgroundRepeat: "no-repeat",
+                          clipPath: isTriangleCut ? getTriangleClipPath(piece.position) : undefined,
                         }}
                       />
                     )}
