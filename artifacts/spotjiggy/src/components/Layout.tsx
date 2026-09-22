@@ -23,7 +23,7 @@ export function Layout({ children }: LayoutProps) {
   if (location === "/login") return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <nav className="sticky top-0 z-50 bg-card border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/">
@@ -109,9 +109,24 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-8">
         {children}
       </main>
+
+      <footer className="border-t border-border bg-card">
+        <div className="max-w-6xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-center sm:text-left">
+            <p className="font-semibold text-foreground">SpotJiggy</p>
+            <p className="text-xs text-muted-foreground">Collect pieces. Complete puzzles.</p>
+          </div>
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <Link href="/" className="hover:text-primary transition-colors">Home</Link>
+            <Link href="/bucket" className="hover:text-primary transition-colors">Bucket</Link>
+            {isLoggedIn && <Link href="/store" className="hover:text-primary transition-colors">Store</Link>}
+            <span>© {new Date().getFullYear()}</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
