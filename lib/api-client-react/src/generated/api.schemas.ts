@@ -274,6 +274,45 @@ export interface CheckoutResult {
   remainingPuzzles?: number;
 }
 
+export type PayPalConfigEnvironment = typeof PayPalConfigEnvironment[keyof typeof PayPalConfigEnvironment];
+
+
+export const PayPalConfigEnvironment = {
+  sandbox: 'sandbox',
+  live: 'live',
+} as const;
+
+export interface PayPalConfig {
+  configured: boolean;
+  environment: PayPalConfigEnvironment;
+}
+
+export interface PayPalOrderInput {
+  packageId: string;
+  /** @nullable */
+  couponCode?: string | null;
+}
+
+export type PayPalOrderResultEnvironment = typeof PayPalOrderResultEnvironment[keyof typeof PayPalOrderResultEnvironment];
+
+
+export const PayPalOrderResultEnvironment = {
+  sandbox: 'sandbox',
+  live: 'live',
+} as const;
+
+export interface PayPalOrderResult {
+  orderId: string;
+  approvalUrl: string;
+  amount: number;
+  currency: string;
+  environment: PayPalOrderResultEnvironment;
+}
+
+export interface PayPalCaptureInput {
+  orderId: string;
+}
+
 export type ListPuzzlesParams = {
 type?: ListPuzzlesType;
 status?: ListPuzzlesStatus;
@@ -300,5 +339,9 @@ export const ListPuzzlesStatus = {
 
 export type ListTrendingPuzzlesParams = {
 limit?: number;
+};
+
+export type CreateCheckout410 = {
+  error: string;
 };
 

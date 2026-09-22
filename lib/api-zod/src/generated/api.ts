@@ -868,14 +868,48 @@ export const ListPackagesResponse = zod.array(ListPackagesResponseItem)
 
 
 /**
- * @summary Purchase a package
+ * @summary Legacy demo checkout endpoint
  */
 export const CreateCheckoutBody = zod.object({
   "packageId": zod.string(),
   "couponCode": zod.string().nullish()
 })
 
-export const CreateCheckoutResponse = zod.object({
+
+/**
+ * @summary Get PayPal checkout availability
+ */
+export const GetPayPalConfigResponse = zod.object({
+  "configured": zod.boolean(),
+  "environment": zod.enum(['sandbox', 'live'])
+})
+
+
+/**
+ * @summary Create a PayPal order for a package
+ */
+export const CreatePayPalOrderBody = zod.object({
+  "packageId": zod.string(),
+  "couponCode": zod.string().nullish()
+})
+
+export const CreatePayPalOrderResponse = zod.object({
+  "orderId": zod.string(),
+  "approvalUrl": zod.string().url(),
+  "amount": zod.number(),
+  "currency": zod.string(),
+  "environment": zod.enum(['sandbox', 'live'])
+})
+
+
+/**
+ * @summary Capture a PayPal order and grant the package
+ */
+export const CapturePayPalOrderBody = zod.object({
+  "orderId": zod.string()
+})
+
+export const CapturePayPalOrderResponse = zod.object({
   "success": zod.boolean(),
   "txid": zod.string(),
   "puzzlesAdded": zod.number(),

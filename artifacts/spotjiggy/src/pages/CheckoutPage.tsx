@@ -1,33 +1,73 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useListPackages, useCreateCheckout, getGetMyStatsQueryKey } from "@workspace/api-client-react";
+import {
+  useListPackages,
+  useGetPayPalConfig,
+  useCreatePayPalOrder,
+  useCapturePayPalOrder,
+  getGetMyStatsQueryKey,
+} from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CheckoutPage() {
   const [location, navigate] = useLocation();
-  const packageId = new URLSearchParams(location.split("?")[1] ?? "").get("packageId") ?? "";
+  const params = new URLSearchParams(location.split("?")[1] ?? "");
+  const packageId = params.get("packageId") ?? "";
+  const paypalState = params.get("paypal");
+  const paypalToken = params.get("token");
   const { isLoggedIn } = useAuth();
-  const [couponCode, setCouponCode] = useState("");
   const [success, setSuccess] = useState<any>(null);
+  const captureStartedRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const { data: packages } = useListPackages();
+  const { data: paypalConfig } = useGetPayPalConfig();
   const selectedPkg = packages?.find(p => p.id === packageId);
 
-  const checkoutMutation = useCreateCheckout({
+  const createOrderMutation = useCreatePayPalOrder({
+    mutation: {
+      onSuccess: (data) => {
+        window.location.assign(data.approvalUrl);
+      },
+      onError: (error: any) => toast({
+        title: error?.data?.error ?? "Could not start PayPal checkout",
+        variant: "destructive",
+      }),
+    },
+  });
+
+  const captureMutation = useCapturePayPalOrder({
     mutation: {
       onSuccess: (data) => {
         setSuccess(data);
         queryClient.invalidateQueries({ queryKey: getGetMyStatsQueryKey() });
       },
-      onError: () => toast({ title: "Checkout failed", variant: "destructive" }),
+      onError: (error: any) => toast({
+        title: error?.data?.error ?? "Could not confirm PayPal payment",
+        description: "Refresh the page to retry the payment confirmation.",
+        variant: "destructive",
+      }),
     },
   });
+
+  useEffect(() => {
+    if (
+      !isLoggedIn ||
+      paypalState !== "success" ||
+      !paypalToken ||
+      captureStartedRef.current === paypalToken
+    ) {
+      return;
+    }
+
+    captureStartedRef.current = paypalToken;
+    captureMutation.mutate({ data: { orderId: paypalToken } });
+  }, [captureMutation, isLoggedIn, paypalState, paypalToken]);
 
   if (!isLoggedIn) {
     return (
@@ -40,9 +80,9 @@ export default function CheckoutPage() {
   }
 
   const handleCheckout = () => {
-    if (!packageId) return;
-    checkoutMutation.mutate({
-      data: { packageId, couponCode: couponCode || null },
+    if (!packageId || !paypalConfig?.configured) return;
+    createOrderMutation.mutate({
+      data: { packageId },
     });
   };
 
@@ -50,7 +90,7 @@ export default function CheckoutPage() {
     <Layout>
       <div className="max-w-md mx-auto">
         <AnimatePresence mode="wait">
-          {success ? (
+           {success ? (
             <motion.div
               key="success"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -84,7 +124,20 @@ export default function CheckoutPage() {
                 Start Creating Puzzles
               </motion.button>
             </motion.div>
-          ) : (
+           ) : captureMutation.isPending ? (
+             <motion.div
+               key="capturing"
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="text-center bg-card border border-card-border rounded-2xl p-8"
+             >
+               <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto mb-5" />
+               <h1 className="text-xl font-bold text-foreground mb-2">Confirming your payment</h1>
+               <p className="text-sm text-muted-foreground">
+                 PayPal approved the order. We’re securely adding your puzzle slots now.
+               </p>
+             </motion.div>
+           ) : (
             <motion.div
               key="form"
               initial={{ opacity: 0, y: 20 }}
@@ -92,12 +145,22 @@ export default function CheckoutPage() {
             >
               <h1 className="text-2xl font-bold text-foreground mb-6">Checkout</h1>
 
+               {paypalState === "cancelled" && (
+                 <div className="mb-5 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-foreground">
+                   Your PayPal payment was cancelled. No puzzle slots were added.
+                 </div>
+               )}
+
               {selectedPkg ? (
                 <div className="bg-card border border-card-border rounded-2xl p-5 mb-5">
-                  <h2 className="font-semibold text-foreground mb-3">Order Summary</h2>
+                   <div className="flex items-center justify-between mb-3">
+                     <h2 className="font-semibold text-foreground">Order Summary</h2>
+                     <span className="text-xs font-semibold text-muted-foreground">1 item</span>
+                   </div>
                   <div className="flex justify-between items-center py-3 border-b border-border">
                     <div>
                       <p className="font-medium text-foreground">{selectedPkg.puzzleCount} Puzzle Pack</p>
+                       <p className="text-xs text-muted-foreground mt-1">Creator slots · delivered instantly</p>
                       {selectedPkg.discountName && (
                         <p className="text-xs text-secondary">{selectedPkg.discountName}</p>
                       )}
@@ -120,35 +183,26 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              <div className="bg-card border border-card-border rounded-2xl p-5 mb-5">
-                <h2 className="font-semibold text-foreground mb-3">Coupon Code</h2>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={e => setCouponCode(e.target.value)}
-                    placeholder="Enter code (optional)"
-                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                  />
-                  <button className="px-4 py-2.5 border border-input rounded-xl text-sm font-medium hover:bg-muted transition-colors">
-                    Apply
-                  </button>
-                </div>
-              </div>
+               <div className="bg-muted rounded-xl p-4 mb-5 text-sm text-muted-foreground">
+                 You’ll be redirected to PayPal to review and approve this one-time payment. SpotJiggy never sees your PayPal password.
+               </div>
 
-              <div className="bg-muted rounded-xl p-4 mb-5 text-sm text-muted-foreground">
-                This is a demo checkout. No real payment will be processed.
-              </div>
+               {!paypalConfig?.configured && (
+                 <div className="mb-5 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm text-muted-foreground">
+                   PayPal setup is pending. Add <span className="font-mono text-xs">PAYPAL_CLIENT_ID</span> and <span className="font-mono text-xs">PAYPAL_CLIENT_SECRET</span> to the API server to enable checkout.
+                 </div>
+               )}
 
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleCheckout}
-                disabled={!selectedPkg || checkoutMutation.isPending}
-                className="w-full py-3.5 bg-primary text-primary-foreground font-bold rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50"
+                 disabled={!selectedPkg || !paypalConfig?.configured || createOrderMutation.isPending}
+                 className="w-full py-3.5 bg-[#0070ba] text-white font-bold rounded-xl hover:bg-[#005ea6] transition-colors disabled:opacity-50"
               >
-                {checkoutMutation.isPending ? "Processing..." : `Complete Purchase — $${selectedPkg?.price.toFixed(2) ?? "0.00"}`}
+                 {createOrderMutation.isPending ? "Opening PayPal..." : `Pay with PayPal — $${selectedPkg?.price.toFixed(2) ?? "0.00"}`}
               </motion.button>
+               <p className="text-center text-xs text-muted-foreground mt-3">Secure checkout · No shipping required</p>
             </motion.div>
           )}
         </AnimatePresence>

@@ -497,7 +497,7 @@ paths:
     post:
       operationId: createCheckout
       tags: [store]
-      summary: Purchase a package
+      summary: Legacy demo checkout endpoint
       requestBody:
         required: true
         content:
@@ -505,8 +505,63 @@ paths:
             schema:
               $ref: "#/components/schemas/CheckoutInput"
       responses:
+        "410":
+          description: Demo checkout disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+
+  /store/paypal/config:
+    get:
+      operationId: getPayPalConfig
+      tags: [store]
+      summary: Get PayPal checkout availability
+      responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayPalConfig"
+
+  /store/paypal/order:
+    post:
+      operationId: createPayPalOrder
+      tags: [store]
+      summary: Create a PayPal order for a package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayPalOrderInput"
+      responses:
+        "200":
+          description: PayPal order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayPalOrderResult"
+
+  /store/paypal/capture:
+    post:
+      operationId: capturePayPalOrder
+      tags: [store]
+      summary: Capture a PayPal order and grant the package
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayPalCaptureInput"
+      responses:
+        "200":
+          description: PayPal order captured
           content:
             application/json:
               schema:
@@ -926,3 +981,46 @@ components:
           type: integer
         remainingPuzzles:
           type: integer
+
+    PayPalConfig:
+      type: object
+      required: [configured, environment]
+      properties:
+        configured:
+          type: boolean
+        environment:
+          type: string
+          enum: [sandbox, live]
+
+    PayPalOrderInput:
+      type: object
+      required: [packageId]
+      properties:
+        packageId:
+          type: string
+        couponCode:
+          type: ["string", "null"]
+
+    PayPalOrderResult:
+      type: object
+      required: [orderId, approvalUrl, amount, currency, environment]
+      properties:
+        orderId:
+          type: string
+        approvalUrl:
+          type: string
+          format: uri
+        amount:
+          type: number
+        currency:
+          type: string
+        environment:
+          type: string
+          enum: [sandbox, live]
+
+    PayPalCaptureInput:
+      type: object
+      required: [orderId]
+      properties:
+        orderId:
+          type: string

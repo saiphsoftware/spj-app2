@@ -11,6 +11,7 @@ A full-stack jigsaw puzzle platform where users upload images, slice them into p
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
+- Optional PayPal env: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENVIRONMENT` (`sandbox` or `live`), and `PAYPAL_RETURN_URL_BASE`
 
 ## Stack
 
@@ -38,7 +39,7 @@ A full-stack jigsaw puzzle platform where users upload images, slice them into p
 - **Simple auth**: Base64-encoded `sub:timestamp` tokens in localStorage. The API server decodes the sub from the Bearer token. No JWT library needed for MVP.
 - **Puzzle types**: `solo` (every player collects all pieces independently) vs `group` (each piece can only be collected once — players must cooperate).
 - **Piece images**: Currently use the same image as the puzzle with position-based CSS clipping for the preview; extend to actual image slicing in production.
-- **Store is demo-only**: Checkout creates a purchase record and adds puzzle slots immediately with no real payment processor.
+- **Store payments**: Checkout uses a server-side PayPal order/capture flow; it stays disabled until PayPal credentials are configured.
 
 ## Product
 

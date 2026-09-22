@@ -1,13 +1,14 @@
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
-import { useListPackages, useGetMyStats, getGetMyStatsQueryKey } from "@workspace/api-client-react";
+import { useListPackages, useGetMyStats, getGetMyStatsQueryKey, useGetPayPalConfig } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function StorePage() {
   const { isLoggedIn } = useAuth();
   const { data: packages, isLoading } = useListPackages();
   const { data: myStats } = useGetMyStats({ query: { enabled: isLoggedIn, queryKey: getGetMyStatsQueryKey() } });
+  const { data: paypalConfig } = useGetPayPalConfig();
 
   return (
     <Layout>
@@ -16,6 +17,20 @@ export default function StorePage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <h1 className="text-3xl font-bold text-foreground mb-2">Puzzle Creator Packs</h1>
             <p className="text-muted-foreground">Get more puzzle slots to share with the world.</p>
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#003087]/10 text-[#003087] text-xs font-semibold">
+                <span className="font-bold">PayPal</span> secure checkout
+              </span>
+              {paypalConfig && (
+                <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${
+                  paypalConfig.configured
+                    ? "bg-green-100 text-green-700"
+                    : "bg-accent/20 text-muted-foreground"
+                }`}>
+                  {paypalConfig.configured ? "Ready to purchase" : "Payment setup pending"}
+                </span>
+              )}
+            </div>
             {isLoggedIn && myStats && (
               <div className="inline-flex items-center gap-2 mt-4 px-4 py-2 bg-accent/20 border border-accent/30 rounded-full">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-foreground">
@@ -56,7 +71,7 @@ export default function StorePage() {
                 )}
 
                 <div className="mb-4">
-                  <div className="text-4xl font-bold text-foreground mb-1">
+                   <div className="text-4xl font-bold text-foreground mb-1">
                     {pkg.puzzleCount}
                     <span className="text-lg font-medium text-muted-foreground ml-1">puzzles</span>
                   </div>
@@ -74,9 +89,15 @@ export default function StorePage() {
                       <span className="text-muted-foreground line-through text-sm">${pkg.originalPrice.toFixed(2)}</span>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
+                   <p className="text-xs text-muted-foreground mt-1">
                     ${(pkg.price / pkg.puzzleCount).toFixed(2)} per puzzle
                   </p>
+                   <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
+                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                       <path d="M12 3v18M17 7.5c-.8-1-2.1-1.5-4-1.5-2.2 0-4 1.1-4 3s1.6 2.7 4 3.2 4 1.2 4 3.3-1.7 3-4 3c-1.9 0-3.4-.6-4.3-1.8" />
+                     </svg>
+                     One-time purchase
+                   </div>
                 </div>
 
                 <Link href={`/store/checkout?packageId=${pkg.id}`}>
@@ -89,7 +110,7 @@ export default function StorePage() {
                         : "bg-muted text-foreground hover:bg-muted/80"
                     }`}
                   >
-                    Get {pkg.puzzleCount} Puzzles
+                     Continue to PayPal
                   </motion.button>
                 </Link>
               </motion.div>
