@@ -10,7 +10,11 @@ A full-stack jigsaw puzzle platform where users upload images, slice them into p
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/scripts run db:export` — export the development database to a private `db-exports/*.dump` archive
+- `RESTORE_DATABASE_URL=... pnpm --filter @workspace/scripts run db:import -- db-exports/<archive>.dump` — restore an archive to a separate PostgreSQL database; add `--replace` only when you intend to drop conflicting target objects
+- To restore outside Replit, download the generated `.dump` file and run `pg_restore --no-owner --no-privileges --exit-on-error --single-transaction --dbname="$RESTORE_DATABASE_URL" ./spotjiggy-dev.dump` on a machine with PostgreSQL client tools installed
 - Required env: `DATABASE_URL` — Postgres connection string
+- Database exports include schema and data. Keep the generated archive private; `db-exports/` is git-ignored.
 - Optional PayPal env: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENVIRONMENT` (`sandbox` or `live`), and `PAYPAL_RETURN_URL_BASE`
 
 ## Stack
