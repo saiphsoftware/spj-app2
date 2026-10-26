@@ -14,6 +14,10 @@ function Home() {
           <span className="brand-name">SpotJiggy</span>
         </div>
         <h1 className="coming-soon">Coming <span>soon</span></h1>
+        <p className="product-description">
+          Turn favorite pictures into puzzles. Share individual pieces, collect them, and complete
+          the picture solo or with friends.
+        </p>
         <div className="tile-orbit" aria-hidden="true">
           {Array.from({ length: 9 }, (_, index) => <i key={index} />)}
         </div>

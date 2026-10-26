@@ -357,10 +357,19 @@
   color: hsl(var(--primary));
 }
 
+.product-description {
+  max-width: 610px;
+  margin: 24px auto 0;
+  color: hsl(var(--muted-foreground));
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  line-height: 1.55;
+  text-wrap: balance;
+}
+
 .tile-orbit {
   width: clamp(156px, 23vw, 254px);
   aspect-ratio: 1;
-  margin: clamp(36px, 6vw, 64px) auto 0;
+  margin: clamp(28px, 4vw, 48px) auto 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: clamp(7px, 1.25vw, 13px);
