@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/spotjiggy-prelaunch/"
+title = "SpotJiggy Prelaunch"
+description = "A standalone, static coming-soon page for SpotJiggy. No email signup, contact form, account creation, or data collection."
+version = "1.0.0"
+id = "artifacts/spotjiggy-prelaunch"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/spotjiggy-prelaunch/" ]
+localPort = 18946
+
+[services.development]
+run = "pnpm --filter @workspace/spotjiggy-prelaunch run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/spotjiggy-prelaunch", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/spotjiggy-prelaunch/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18946"
+BASE_PATH = "/spotjiggy-prelaunch/"
