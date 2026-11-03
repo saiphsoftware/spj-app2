@@ -103,6 +103,26 @@ export const GetMeResponse = zod.object({
 
 
 /**
+ * @summary Submit general feedback
+ */
+export const submitFeedbackBodyMessageMin = 10;
+export const submitFeedbackBodyMessageMax = 2000;
+
+export const submitFeedbackBodyEmailMax = 254;
+
+export const submitFeedbackBodyPageMax = 300;
+
+
+
+export const SubmitFeedbackBody = zod.object({
+  "category": zod.enum(['bug', 'idea', 'other']),
+  "message": zod.string().min(submitFeedbackBodyMessageMin).max(submitFeedbackBodyMessageMax),
+  "email": zod.string().email().max(submitFeedbackBodyEmailMax).optional(),
+  "page": zod.string().max(submitFeedbackBodyPageMax).optional()
+})
+
+
+/**
  * @summary List active/open puzzles (home feed)
  */
 export const listPuzzlesQueryLimitDefault = 20;
@@ -399,6 +419,23 @@ export const UpdatePuzzleResponse = zod.object({
  */
 export const DeletePuzzleParams = zod.object({
   "id": zod.coerce.string()
+})
+
+
+/**
+ * @summary Report a puzzle for review
+ */
+export const ReportPuzzleParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const reportPuzzleBodyDetailsMax = 1500;
+
+
+
+export const ReportPuzzleBody = zod.object({
+  "reason": zod.enum(['inappropriate', 'spam', 'harassment', 'copyright', 'other']),
+  "details": zod.string().max(reportPuzzleBodyDetailsMax).optional()
 })
 
 

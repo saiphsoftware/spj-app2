@@ -4,6 +4,8 @@ import { useGetMe, getGetMeQueryKey, useLogout } from "@workspace/api-client-rea
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { useBucket } from "@/context/BucketContext";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
+import { Button } from "@/components/ui/button";
 
 interface LayoutProps {
   children: ReactNode;
@@ -131,6 +133,11 @@ export function Layout({ children }: LayoutProps) {
             <Link href="/" className="hover:text-primary transition-colors">Home</Link>
             <Link href="/bucket" className="hover:text-primary transition-colors">Bucket</Link>
             {isLoggedIn && <Link href="/store" className="hover:text-primary transition-colors">Store</Link>}
+            <FeedbackDialog>
+              <Button type="button" variant="ghost" size="sm" className="text-muted-foreground">
+                Send feedback
+              </Button>
+            </FeedbackDialog>
             <span>© {new Date().getFullYear()}</span>
           </div>
         </div>

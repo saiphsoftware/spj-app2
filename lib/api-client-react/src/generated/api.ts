@@ -27,6 +27,7 @@ import type {
   CheckoutResult,
   CollectResult,
   CreateCheckout410,
+  FeedbackInput,
   ForgotPasswordInput,
   ForgotPasswordResult,
   HealthStatus,
@@ -43,10 +44,12 @@ import type {
   Puzzle,
   PuzzleDetail,
   PuzzleInput,
+  PuzzleReportInput,
   PuzzleUpdate,
   RegisterInput,
   ResetPasswordInput,
   ResetPasswordResult,
+  SubmissionReceipt,
   User,
   UserProfile,
   UserStats
@@ -573,6 +576,77 @@ export function useGetMe<TData = Awaited<ReturnType<typeof getMe>>, TError = Err
 
 
 
+export const getSubmitFeedbackUrl = () => {
+
+
+
+
+  return `/api/feedback`
+}
+
+/**
+ * @summary Submit general feedback
+ */
+export const submitFeedback = async (feedbackInput: FeedbackInput, options?: RequestInit): Promise<SubmissionReceipt> => {
+
+  return customFetch<SubmissionReceipt>(getSubmitFeedbackUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      feedbackInput,)
+  }
+);}
+
+
+
+
+export const getSubmitFeedbackMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFeedback>>, TError,{data: BodyType<FeedbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitFeedback>>, TError,{data: BodyType<FeedbackInput>}, TContext> => {
+
+const mutationKey = ['submitFeedback'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitFeedback>>, {data: BodyType<FeedbackInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitFeedback(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitFeedbackMutationResult = NonNullable<Awaited<ReturnType<typeof submitFeedback>>>
+    export type SubmitFeedbackMutationBody = BodyType<FeedbackInput>
+    export type SubmitFeedbackMutationError = ErrorType<void>
+
+    /**
+ * @summary Submit general feedback
+ */
+export const useSubmitFeedback = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitFeedback>>, TError,{data: BodyType<FeedbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitFeedback>>,
+        TError,
+        {data: BodyType<FeedbackInput>},
+        TContext
+      > => {
+      return useMutation(getSubmitFeedbackMutationOptions(options));
+    }
+
 export const getListPuzzlesUrl = (params?: ListPuzzlesParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -1029,6 +1103,78 @@ export const useDeletePuzzle = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeletePuzzleMutationOptions(options));
+    }
+
+export const getReportPuzzleUrl = (id: string,) => {
+
+
+
+
+  return `/api/puzzles/${id}/reports`
+}
+
+/**
+ * @summary Report a puzzle for review
+ */
+export const reportPuzzle = async (id: string,
+    puzzleReportInput: PuzzleReportInput, options?: RequestInit): Promise<SubmissionReceipt> => {
+
+  return customFetch<SubmissionReceipt>(getReportPuzzleUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      puzzleReportInput,)
+  }
+);}
+
+
+
+
+export const getReportPuzzleMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportPuzzle>>, TError,{id: string;data: BodyType<PuzzleReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reportPuzzle>>, TError,{id: string;data: BodyType<PuzzleReportInput>}, TContext> => {
+
+const mutationKey = ['reportPuzzle'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reportPuzzle>>, {id: string;data: BodyType<PuzzleReportInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reportPuzzle(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReportPuzzleMutationResult = NonNullable<Awaited<ReturnType<typeof reportPuzzle>>>
+    export type ReportPuzzleMutationBody = BodyType<PuzzleReportInput>
+    export type ReportPuzzleMutationError = ErrorType<void>
+
+    /**
+ * @summary Report a puzzle for review
+ */
+export const useReportPuzzle = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reportPuzzle>>, TError,{id: string;data: BodyType<PuzzleReportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reportPuzzle>>,
+        TError,
+        {id: string;data: BodyType<PuzzleReportInput>},
+        TContext
+      > => {
+      return useMutation(getReportPuzzleMutationOptions(options));
     }
 
 export const getPublishPuzzleUrl = (id: string,) => {

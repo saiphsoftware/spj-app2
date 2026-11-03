@@ -9,6 +9,50 @@ export interface HealthStatus {
   status: string;
 }
 
+export type FeedbackInputCategory = typeof FeedbackInputCategory[keyof typeof FeedbackInputCategory];
+
+
+export const FeedbackInputCategory = {
+  bug: 'bug',
+  idea: 'idea',
+  other: 'other',
+} as const;
+
+export interface FeedbackInput {
+  category: FeedbackInputCategory;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  message: string;
+  /** @maxLength 254 */
+  email?: string;
+  /** @maxLength 300 */
+  page?: string;
+}
+
+export type PuzzleReportInputReason = typeof PuzzleReportInputReason[keyof typeof PuzzleReportInputReason];
+
+
+export const PuzzleReportInputReason = {
+  inappropriate: 'inappropriate',
+  spam: 'spam',
+  harassment: 'harassment',
+  copyright: 'copyright',
+  other: 'other',
+} as const;
+
+export interface PuzzleReportInput {
+  reason: PuzzleReportInputReason;
+  /** @maxLength 1500 */
+  details?: string;
+}
+
+export interface SubmissionReceipt {
+  id: string;
+  message: string;
+}
+
 export interface RegisterInput {
   name: string;
   email: string;
