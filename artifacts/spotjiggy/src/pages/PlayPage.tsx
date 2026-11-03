@@ -15,6 +15,7 @@ import { addAcquiredPiece, loadAcquired, saveAcquired } from "@/lib/pieceStorage
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { getCutDimensions, getTriangleClipPath } from "@/lib/puzzleCuts";
+import { ReportPuzzleDialog } from "@/components/ReportPuzzleDialog";
 
 // ─── Piece state legend ───────────────────────────────────────────────────────
 // State 1 – "acquired + available"  : user has the piece, not yet placed → COLOR, draggable
@@ -226,7 +227,7 @@ export default function PlayPage() {
               <h1 className="text-2xl font-bold text-foreground">
                 {puzzle.message || "Untitled Puzzle"}
               </h1>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex flex-wrap items-center gap-2 mt-1">
                 <img
                   src={puzzle.createdBy.avatar}
                   alt={puzzle.createdBy.name}
@@ -239,6 +240,7 @@ export default function PlayPage() {
                 }`}>
                   {puzzle.type}
                 </span>
+                <ReportPuzzleDialog puzzleId={id} />
               </div>
             </div>
             <div className="text-right shrink-0 ml-4">

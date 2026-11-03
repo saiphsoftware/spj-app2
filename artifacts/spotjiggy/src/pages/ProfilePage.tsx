@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { Layout } from "@/components/Layout";
 import { useGetUserProfile, useListUserActivityFeed, useGetMyStats, useGetMe, useGetMyPuzzles, getGetMyStatsQueryKey, getGetMeQueryKey, getGetMyPuzzlesQueryKey } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
+import { Button } from "@/components/ui/button";
 
 function timeAgo(ts: number): string {
   const diff = Math.floor(Date.now() / 1000) - ts;
@@ -62,7 +64,7 @@ export default function ProfilePage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-card border border-card-border rounded-2xl p-6 mb-5"
         >
-          <div className="flex items-center gap-4 mb-5">
+          <div className="flex flex-wrap items-center gap-4 mb-5">
             <img
               src={profile.avatar}
               alt={profile.name}
@@ -73,6 +75,13 @@ export default function ProfilePage() {
               <h1 className="text-xl font-bold text-foreground">{profile.name}</h1>
               <p className="text-muted-foreground text-sm">Member since {new Date(profile.created * 1000).toLocaleDateString()}</p>
             </div>
+            {isOwnProfile && (
+              <FeedbackDialog>
+                <Button type="button" variant="outline" size="sm" className="sm:ml-auto">
+                  Send feedback
+                </Button>
+              </FeedbackDialog>
+            )}
           </div>
 
           <div className="grid grid-cols-4 gap-3">

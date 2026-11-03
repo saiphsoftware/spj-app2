@@ -20,6 +20,8 @@ tags:
     description: User operations
   - name: store
     description: Store and packages
+  - name: feedback
+    description: Feedback and puzzle reports
 paths:
   /healthz:
     get:
@@ -143,6 +145,27 @@ paths:
                 $ref: "#/components/schemas/User"
         "401":
           description: Unauthorized
+
+  /feedback:
+    post:
+      operationId: submitFeedback
+      tags: [feedback]
+      summary: Submit general feedback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackInput"
+      responses:
+        "201":
+          description: Feedback received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionReceipt"
+        "400":
+          description: Validation error
 
   # ── Puzzles ───────────────────────────────────────────────────────────────
   /puzzles:
@@ -275,6 +298,35 @@ paths:
       responses:
         "204":
           description: Deleted
+
+  /puzzles/{id}/reports:
+    post:
+      operationId: reportPuzzle
+      tags: [feedback]
+      summary: Report a puzzle for review
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PuzzleReportInput"
+      responses:
+        "201":
+          description: Report received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionReceipt"
+        "400":
+          description: Validation error
+        "404":
+          description: Puzzle not found
 
   /puzzles/{id}/publish:
     post:
@@ -576,6 +628,45 @@ components:
           type: string
       required:
         - status
+
+    FeedbackInput:
+      type: object
+      required: [category, message]
+      properties:
+        category:
+          type: string
+          enum: [bug, idea, other]
+        message:
+          type: string
+          minLength: 10
+          maxLength: 2000
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        page:
+          type: string
+          maxLength: 300
+
+    PuzzleReportInput:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [inappropriate, spam, harassment, copyright, other]
+        details:
+          type: string
+          maxLength: 1500
+
+    SubmissionReceipt:
+      type: object
+      required: [id, message]
+      properties:
+        id:
+          type: string
+        message:
+          type: string
 
     # ── Auth schemas ────────────────────────────────────────────────────────
     RegisterInput:
