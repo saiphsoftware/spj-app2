@@ -3,6 +3,7 @@ import { db, packagesTable, purchasesTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import { CapturePayPalOrderBody, CreatePayPalOrderBody } from "@workspace/api-zod";
+import { getAuthenticatedSub } from "../lib/auth";
 
 const router = Router();
 type PayPalEnvironment = "sandbox" | "live";
@@ -26,14 +27,6 @@ class PayPalRequestError extends Error {
     super(message);
     this.name = "PayPalRequestError";
   }
-}
-
-function getSub(req: any): string | null {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  try {
-    return Buffer.from(auth.slice(7), "base64").toString().split(":")[0];
-  } catch { return null; }
 }
 
 function getPayPalEnvironment(): PayPalEnvironment {
@@ -149,7 +142,7 @@ router.get("/store/paypal/config", (_req, res): void => {
 });
 
 router.post("/store/paypal/order", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = await getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const parsed = CreatePayPalOrderBody.safeParse(req.body);
@@ -210,7 +203,7 @@ router.post("/store/paypal/order", async (req, res): Promise<void> => {
 });
 
 router.post("/store/paypal/capture", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = await getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const parsed = CapturePayPalOrderBody.safeParse(req.body);

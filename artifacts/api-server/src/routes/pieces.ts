@@ -2,16 +2,9 @@ import { Router } from "express";
 import { db, piecesTable, pieceCollectionsTable, puzzlesTable, usersTable, activityTable, userBadgesTable, badgesTable, puzzleParticipantsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { getAuthenticatedSub } from "../lib/auth";
 
 const router = Router();
-
-function getSub(req: any): string | null {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  try {
-    return Buffer.from(auth.slice(7), "base64").toString().split(":")[0];
-  } catch { return null; }
-}
 
 router.get("/pieces/:id", async (req, res): Promise<void> => {
   const pieces = await db.select().from(piecesTable).where(eq(piecesTable.id, req.params.id)).limit(1);
@@ -28,7 +21,7 @@ router.get("/pieces/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/pieces/:id/collect", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = await getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const pieces = await db.select().from(piecesTable).where(eq(piecesTable.id, req.params.id)).limit(1);

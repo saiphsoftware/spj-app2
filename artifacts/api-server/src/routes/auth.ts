@@ -1,7 +1,12 @@
 import { Router } from "express";
-import { db, usersTable, activityTable } from "@workspace/db";
+import { db, usersTable, activityTable, sessionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import {
+  createSession,
+  getAuthenticatedSub,
+  revokeSession,
+} from "../lib/auth";
 import {
   RegisterBody,
   LoginBody,
@@ -16,10 +21,6 @@ const resetTokens = new Map<string, { sub: string; expiresAt: number }>();
 
 function hashPassword(pw: string): string {
   return crypto.createHash("sha256").update(pw + "spotjiggy_salt").digest("hex");
-}
-
-function makeToken(sub: string): string {
-  return Buffer.from(`${sub}:${Date.now()}`).toString("base64");
 }
 
 function avatarUrl(name: string): string {
@@ -62,7 +63,8 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     details: "Joined SpotJiggy",
   });
 
-  res.status(201).json({ user: user[0], token: makeToken(sub) });
+  const token = await createSession(sub);
+  res.status(201).json({ user: user[0], token });
 });
 
 router.post("/auth/login", async (req, res): Promise<void> => {
@@ -77,7 +79,8 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
-  res.json({ user: users[0], token: makeToken(users[0].sub) });
+  const token = await createSession(users[0].sub);
+  res.json({ user: users[0], token });
 });
 
 router.post("/auth/forgot-password", async (req, res): Promise<void> => {
@@ -131,36 +134,37 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
     return;
   }
 
-  await db.update(usersTable)
-    .set({ passwordHash: hashPassword(parsed.data.password) })
-    .where(eq(usersTable.sub, reset.sub));
+  const now = Math.floor(Date.now() / 1000);
+  await db.transaction(async (tx) => {
+    await tx.update(usersTable)
+      .set({ passwordHash: hashPassword(parsed.data.password) })
+      .where(eq(usersTable.sub, reset.sub));
+    await tx.update(sessionsTable)
+      .set({ revokedAt: now })
+      .where(eq(sessionsTable.userSub, reset.sub));
+  });
   resetTokens.delete(parsed.data.token);
 
   res.json({ success: true, message: "Password updated. You can sign in now." });
 });
 
-router.post("/auth/logout", async (_req, res): Promise<void> => {
+router.post("/auth/logout", async (req, res): Promise<void> => {
+  await revokeSession(req);
   res.json({ ok: true });
 });
 
 router.get("/auth/me", async (req, res): Promise<void> => {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) {
+  const sub = await getAuthenticatedSub(req);
+  if (!sub) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  try {
-    const decoded = Buffer.from(auth.slice(7), "base64").toString();
-    const sub = decoded.split(":")[0];
-    const users = await db.select().from(usersTable).where(eq(usersTable.sub, sub)).limit(1);
-    if (users.length === 0) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    res.json(users[0]);
-  } catch {
+  const users = await db.select().from(usersTable).where(eq(usersTable.sub, sub)).limit(1);
+  if (users.length === 0) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
   }
+  res.json(users[0]);
 });
 
 export default router;

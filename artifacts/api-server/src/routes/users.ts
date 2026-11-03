@@ -1,19 +1,12 @@
 import { Router } from "express";
 import { db, usersTable, activityTable, pieceCollectionsTable, piecesTable, userBadgesTable, badgesTable, puzzlesTable, puzzleParticipantsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { getAuthenticatedSub } from "../lib/auth";
 
 const router = Router();
 
-function getSub(req: any): string | null {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  try {
-    return Buffer.from(auth.slice(7), "base64").toString().split(":")[0];
-  } catch { return null; }
-}
-
 router.get("/users/me/stats", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = await getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const user = await db.select().from(usersTable).where(eq(usersTable.sub, sub)).limit(1);
@@ -34,7 +27,7 @@ router.get("/users/me/stats", async (req, res): Promise<void> => {
 });
 
 router.get("/users/me/pieces", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = await getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const collections = await db.select().from(pieceCollectionsTable).where(eq(pieceCollectionsTable.userSub, sub));
@@ -48,7 +41,7 @@ router.get("/users/me/pieces", async (req, res): Promise<void> => {
 });
 
 router.get("/users/me/badges", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = await getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const userBadges = await db.select().from(userBadgesTable).where(eq(userBadgesTable.userSub, sub));
@@ -61,7 +54,7 @@ router.get("/users/me/badges", async (req, res): Promise<void> => {
 });
 
 router.get("/users/me/puzzles", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = await getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const allPuzzles = await db.select().from(puzzlesTable).where(eq(puzzlesTable.creatorSub, sub));

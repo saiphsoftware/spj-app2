@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useGetMe, getGetMeQueryKey, useLogout } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { useBucket } from "@/context/BucketContext";
@@ -14,8 +14,16 @@ export function Layout({ children }: LayoutProps) {
   const { isLoggedIn, setToken } = useAuth();
   const { pieces: bucketPieces } = useBucket();
   const { data: me } = useGetMe({ query: { enabled: isLoggedIn, queryKey: getGetMeQueryKey() } });
+  const logout = useLogout();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logout.mutateAsync();
+    } catch (error) {
+      console.error("Could not confirm server-side sign out.", error);
+      window.alert("Could not reach the server to sign out. Please try again.");
+      return;
+    }
     setToken(null);
     window.location.href = "/";
   };

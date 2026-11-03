@@ -13,6 +13,13 @@ export const usersTable = pgTable("users", {
   created: integer("created").notNull(),
 });
 
+export const sessionsTable = pgTable("sessions", {
+  id: text("id").primaryKey(),
+  userSub: text("user_sub").notNull().references(() => usersTable.sub, { onDelete: "cascade" }),
+  expiresAt: integer("expires_at").notNull(),
+  revokedAt: integer("revoked_at"),
+});
+
 export const activityTable = pgTable("activity", {
   id: text("id").primaryKey(),
   userSub: text("user_sub").notNull().references(() => usersTable.sub),
