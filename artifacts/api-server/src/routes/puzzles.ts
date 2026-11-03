@@ -8,16 +8,9 @@ import {
   ListPuzzlesQueryParams,
   ListTrendingPuzzlesQueryParams,
 } from "@workspace/api-zod";
+import { getAuthenticatedSub } from "../lib/auth";
 
 const router = Router();
-
-function getSub(req: any): string | null {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) return null;
-  try {
-    return Buffer.from(auth.slice(7), "base64").toString().split(":")[0];
-  } catch { return null; }
-}
 
 function buildShareUrl(pieceId: string): string {
   return `/play/piece/${pieceId}`;
@@ -111,7 +104,7 @@ router.get("/puzzles/trending", async (req, res): Promise<void> => {
 });
 
 router.post("/puzzles", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const parsed = CreatePuzzleBody.safeParse(req.body);
@@ -178,7 +171,7 @@ router.get("/puzzles/:id", async (req, res): Promise<void> => {
   const puzzle = await getPuzzleWithPieces(req.params.id);
   if (!puzzle) { res.status(404).json({ error: "Not found" }); return; }
 
-  const sub = getSub(req);
+  const sub = getAuthenticatedSub(req);
   if (sub === puzzle.createdBy.sub) {
     const participants = await db.select().from(puzzleParticipantsTable).where(eq(puzzleParticipantsTable.puzzleId, req.params.id));
     const completers = participants.filter(p => p.completed === 1);
@@ -196,7 +189,7 @@ router.get("/puzzles/:id", async (req, res): Promise<void> => {
 });
 
 router.patch("/puzzles/:id", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const parsed = UpdatePuzzleBody.safeParse(req.body);
@@ -223,7 +216,7 @@ router.patch("/puzzles/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/puzzles/:id", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const puzzles = await db.select().from(puzzlesTable).where(eq(puzzlesTable.id, req.params.id)).limit(1);
@@ -241,7 +234,7 @@ router.delete("/puzzles/:id", async (req, res): Promise<void> => {
 });
 
 router.post("/puzzles/:id/publish", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const puzzles = await db.select().from(puzzlesTable).where(eq(puzzlesTable.id, req.params.id)).limit(1);
@@ -263,7 +256,7 @@ router.post("/puzzles/:id/publish", async (req, res): Promise<void> => {
 });
 
 router.post("/puzzles/:id/close", async (req, res): Promise<void> => {
-  const sub = getSub(req);
+  const sub = getAuthenticatedSub(req);
   if (!sub) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const puzzles = await db.select().from(puzzlesTable).where(eq(puzzlesTable.id, req.params.id)).limit(1);

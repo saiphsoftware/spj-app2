@@ -10,9 +10,10 @@ export interface HealthStatus {
 }
 
 export interface RegisterInput {
+  /** @minLength 1 */
   name: string;
   email: string;
-  /** @minLength 6 */
+  /** @minLength 8 */
   password: string;
 }
 
@@ -35,7 +36,7 @@ export interface ForgotPasswordResult {
 
 export interface ResetPasswordInput {
   token: string;
-  /** @minLength 6 */
+  /** @minLength 8 */
   password: string;
 }
 
@@ -66,7 +67,6 @@ export interface User {
 
 export interface AuthResult {
   user: User;
-  token: string;
 }
 
 export interface Badge {

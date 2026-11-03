@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
               </div>
               <h2 className="text-lg font-bold text-foreground">Request received</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Non-demo reset links require a connected email provider. The demo account can reset without email verification.
+                Password reset emails are not configured yet. The demo reset flow is available only in development.
               </p>
               <Link href="/login" className="mt-6 inline-block text-sm font-semibold text-primary hover:underline">
                 Back to sign in
@@ -69,8 +69,7 @@ export default function ForgotPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <p className="text-sm leading-6 text-muted-foreground">
-                Enter your account email to begin. For the demo account, use{" "}
-                <strong className="font-semibold text-foreground">demo@spotjiggy.com</strong> to reset immediately.
+                Enter your account email. Email delivery for password resets is not configured yet.
               </p>
               <div>
                 <label htmlFor="reset-email" className="block text-sm font-medium text-foreground mb-1.5">

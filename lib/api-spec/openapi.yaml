@@ -584,12 +584,13 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         email:
           type: string
           format: email
         password:
           type: string
-          minLength: 6
+          minLength: 8
 
     LoginInput:
       type: object
@@ -630,7 +631,7 @@ components:
           type: string
         password:
           type: string
-          minLength: 6
+          minLength: 8
 
     ResetPasswordResult:
       type: object
@@ -643,12 +644,10 @@ components:
 
     AuthResult:
       type: object
-      required: [user, token]
+      required: [user]
       properties:
         user:
           $ref: "#/components/schemas/User"
-        token:
-          type: string
 
     # ── User schemas ────────────────────────────────────────────────────────
     User:

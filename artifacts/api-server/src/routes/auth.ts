@@ -3,6 +3,14 @@ import { db, usersTable, activityTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import {
+  clearSessionCookie,
+  getAuthenticatedSub,
+  hashPassword,
+  passwordHashNeedsUpgrade,
+  setSessionCookie,
+  verifyPassword,
+} from "../lib/auth";
+import {
   RegisterBody,
   LoginBody,
   ForgotPasswordBody,
@@ -14,12 +22,15 @@ const DEMO_EMAIL = "demo@spotjiggy.com";
 const RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
 const resetTokens = new Map<string, { sub: string; expiresAt: number }>();
 
-function hashPassword(pw: string): string {
-  return crypto.createHash("sha256").update(pw + "spotjiggy_salt").digest("hex");
-}
-
-function makeToken(sub: string): string {
-  return Buffer.from(`${sub}:${Date.now()}`).toString("base64");
+function toPublicUser(user: typeof usersTable.$inferSelect) {
+  return {
+    sub: user.sub,
+    name: user.name,
+    avatar: user.avatar,
+    type: user.type,
+    created: user.created,
+    remainingPuzzles: user.remainingPuzzles,
+  };
 }
 
 function avatarUrl(name: string): string {
@@ -33,7 +44,13 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { name, email, password } = parsed.data;
+  const name = parsed.data.name.trim();
+  const email = parsed.data.email.trim().toLowerCase();
+  const { password } = parsed.data;
+  if (!name) {
+    res.status(400).json({ error: "Name is required" });
+    return;
+  }
 
   const existing = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
   if (existing.length > 0) {
@@ -49,7 +66,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     avatar: avatarUrl(name),
     type: "site",
     email,
-    passwordHash: hashPassword(password),
+    passwordHash: await hashPassword(password),
     remainingPuzzles: 3,
     created: now,
   }).returning();
@@ -62,7 +79,8 @@ router.post("/auth/register", async (req, res): Promise<void> => {
     details: "Joined SpotJiggy",
   });
 
-  res.status(201).json({ user: user[0], token: makeToken(sub) });
+  setSessionCookie(req, res, sub);
+  res.status(201).json({ user: toPublicUser(user[0]) });
 });
 
 router.post("/auth/login", async (req, res): Promise<void> => {
@@ -71,13 +89,23 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { email, password } = parsed.data;
+  const email = parsed.data.email.trim().toLowerCase();
+  const { password } = parsed.data;
   const users = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
-  if (users.length === 0 || users[0].passwordHash !== hashPassword(password)) {
+  if (users.length === 0 || !(await verifyPassword(password, users[0].passwordHash))) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
-  res.json({ user: users[0], token: makeToken(users[0].sub) });
+
+  const user = users[0];
+  if (passwordHashNeedsUpgrade(user.passwordHash)) {
+    await db.update(usersTable)
+      .set({ passwordHash: await hashPassword(password) })
+      .where(eq(usersTable.sub, user.sub));
+  }
+
+  setSessionCookie(req, res, user.sub);
+  res.json({ user: toPublicUser(user) });
 });
 
 router.post("/auth/forgot-password", async (req, res): Promise<void> => {
@@ -92,7 +120,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
 
   // The demo account intentionally bypasses email verification so it remains
   // usable in environments where no mail provider is configured.
-  if (email === DEMO_EMAIL && users.length > 0) {
+  if (process.env.NODE_ENV !== "production" && email === DEMO_EMAIL && users.length > 0) {
     const token = crypto.randomBytes(32).toString("hex");
     resetTokens.set(token, {
       sub: users[0].sub,
@@ -132,7 +160,7 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
   }
 
   await db.update(usersTable)
-    .set({ passwordHash: hashPassword(parsed.data.password) })
+    .set({ passwordHash: await hashPassword(parsed.data.password) })
     .where(eq(usersTable.sub, reset.sub));
   resetTokens.delete(parsed.data.token);
 
@@ -140,27 +168,22 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
 });
 
 router.post("/auth/logout", async (_req, res): Promise<void> => {
+  clearSessionCookie(_req, res);
   res.json({ ok: true });
 });
 
 router.get("/auth/me", async (req, res): Promise<void> => {
-  const auth = req.headers.authorization;
-  if (!auth?.startsWith("Bearer ")) {
+  const sub = getAuthenticatedSub(req);
+  if (!sub) {
     res.status(401).json({ error: "Unauthorized" });
     return;
   }
-  try {
-    const decoded = Buffer.from(auth.slice(7), "base64").toString();
-    const sub = decoded.split(":")[0];
-    const users = await db.select().from(usersTable).where(eq(usersTable.sub, sub)).limit(1);
-    if (users.length === 0) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-    res.json(users[0]);
-  } catch {
+  const users = await db.select().from(usersTable).where(eq(usersTable.sub, sub)).limit(1);
+  if (users.length === 0) {
     res.status(401).json({ error: "Unauthorized" });
+    return;
   }
+  res.json(toPublicUser(users[0]));
 });
 
 export default router;

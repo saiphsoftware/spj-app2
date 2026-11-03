@@ -20,12 +20,13 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Register a new user
  */
-export const registerBodyPasswordMin = 6;
+
+export const registerBodyPasswordMin = 8;
 
 
 
 export const RegisterBody = zod.object({
-  "name": zod.string(),
+  "name": zod.string().min(1),
   "email": zod.string().email(),
   "password": zod.string().min(registerBodyPasswordMin)
 })
@@ -49,8 +50,7 @@ export const LoginResponse = zod.object({
   "remainingPuzzles": zod.number().nullish(),
   "piecesCount": zod.number().optional(),
   "badgesCount": zod.number().optional()
-}),
-  "token": zod.string()
+})
 })
 
 
@@ -72,7 +72,7 @@ export const ForgotPasswordResponse = zod.object({
 /**
  * @summary Set a new password using a reset token
  */
-export const resetPasswordBodyPasswordMin = 6;
+export const resetPasswordBodyPasswordMin = 8;
 
 
 

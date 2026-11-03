@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetMe, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useLogout } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import { motion } from "framer-motion";
 import { useBucket } from "@/context/BucketContext";
@@ -11,13 +11,19 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
-  const { isLoggedIn, setToken } = useAuth();
+  const { isLoggedIn, user, clearSession } = useAuth();
   const { pieces: bucketPieces } = useBucket();
-  const { data: me } = useGetMe({ query: { enabled: isLoggedIn, queryKey: getGetMeQueryKey() } });
+  const logoutMutation = useLogout({
+    mutation: {
+      onSuccess: () => {
+        clearSession();
+        window.location.href = "/";
+      },
+    },
+  });
 
   const handleLogout = () => {
-    setToken(null);
-    window.location.href = "/";
+    logoutMutation.mutate();
   };
 
   if (location === "/login") return <>{children}</>;
@@ -73,15 +79,15 @@ export function Layout({ children }: LayoutProps) {
                     Store
                   </motion.button>
                 </Link>
-                {me && (
-                  <Link href={`/profile/${me.sub}`}>
+                {user && (
+                  <Link href={`/profile/${user.sub}`}>
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       className="flex items-center gap-2 ml-2 cursor-pointer px-2 py-1 rounded-lg hover:bg-muted"
                     >
-                      <img src={me.avatar} alt={me.name} className="w-7 h-7 rounded-full border-2 border-primary/30" />
-                      <span className="text-sm font-medium hidden sm:block">{me.name}</span>
+                      <img src={user.avatar} alt={user.name} className="w-7 h-7 rounded-full border-2 border-primary/30" />
+                      <span className="text-sm font-medium hidden sm:block">{user.name}</span>
                     </motion.div>
                   </Link>
                 )}

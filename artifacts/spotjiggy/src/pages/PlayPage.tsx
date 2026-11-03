@@ -26,7 +26,7 @@ type PieceState = "available" | "not-acquired" | "placed";
 export default function PlayPage() {
   const { id } = useParams<{ id: string }>();
   const [location] = useLocation();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
   const { addPiece: addToBucket } = useBucket();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -177,12 +177,7 @@ export default function PlayPage() {
     (acquired.has(piece.id) || (piece.collected ?? []).some((collection: any) => collection.by?.sub === getCurrentUserSub()));
 
   const getCurrentUserSub = () => {
-    try {
-      const token = localStorage.getItem("spotjiggy_token");
-      return token ? atob(token).split(":")[0] : null;
-    } catch {
-      return null;
-    }
+    return user?.sub ?? null;
   };
 
   const placedCount = allPieces.filter((p) => getPieceState(p) === "placed").length;
