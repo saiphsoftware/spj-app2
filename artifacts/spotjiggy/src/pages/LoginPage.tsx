@@ -178,6 +178,27 @@ export default function LoginPage() {
             </motion.button>
           </form>
         </motion.div>
+
+        <Link
+          href="/"
+          className="mt-6 flex items-center justify-center gap-2 rounded-md text-sm font-semibold text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-4"
+        >
+          <svg
+            aria-hidden="true"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m12 19-7-7 7-7" />
+            <path d="M19 12H5" />
+          </svg>
+          Back to homepage
+        </Link>
       </div>
     </div>
   );
