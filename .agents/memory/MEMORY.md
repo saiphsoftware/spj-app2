@@ -1,1 +1,2 @@
 - [Local PostgreSQL tests](local-postgres-tests.md) — temporary servers need an explicit writable socket directory.
+- [Drizzle schema changes](drizzle-schema-changes.md) — non-interactive schema pushes can stop on existing table-name conflicts; review before forcing.

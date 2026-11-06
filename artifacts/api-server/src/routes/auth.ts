@@ -13,6 +13,12 @@ import {
   ForgotPasswordBody,
   ResetPasswordBody,
 } from "@workspace/api-zod";
+import {
+  forgotPasswordRateLimit,
+  loginRateLimit,
+  registerRateLimit,
+  resetPasswordRateLimit,
+} from "../lib/rate-limit";
 
 const router = Router();
 const DEMO_EMAIL = "demo@spotjiggy.com";
@@ -28,7 +34,7 @@ function avatarUrl(name: string): string {
   return `https://api.dicebear.com/7.x/fun-emoji/svg?seed=${seed}`;
 }
 
-router.post("/auth/register", async (req, res): Promise<void> => {
+router.post("/auth/register", registerRateLimit, async (req, res): Promise<void> => {
   const parsed = RegisterBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -67,7 +73,7 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   res.status(201).json({ user: user[0], token });
 });
 
-router.post("/auth/login", async (req, res): Promise<void> => {
+router.post("/auth/login", loginRateLimit, async (req, res): Promise<void> => {
   const parsed = LoginBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -83,7 +89,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   res.json({ user: users[0], token });
 });
 
-router.post("/auth/forgot-password", async (req, res): Promise<void> => {
+router.post("/auth/forgot-password", forgotPasswordRateLimit, async (req, res): Promise<void> => {
   const parsed = ForgotPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -120,7 +126,7 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
   });
 });
 
-router.post("/auth/reset-password", async (req, res): Promise<void> => {
+router.post("/auth/reset-password", resetPasswordRateLimit, async (req, res): Promise<void> => {
   const parsed = ResetPasswordBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
